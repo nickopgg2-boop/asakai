@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="th" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - DMS 4.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = { 
+            darkMode: 'class', 
+            theme: { 
+                extend: { 
+                    fontFamily: { sans: ['Prompt', 'sans-serif'] },
+                    colors: { darkbg: '#0b1120', darkcard: '#151f32', darkborder: '#1e293b' }
+                } 
+            } 
+        };
+        document.addEventListener('DOMContentLoaded', () => { document.documentElement.classList.add('dark'); });
+    </script>
+    <style>
+        body { background-color: #0b1120; color: #94a3b8; }
+        .cyber-card { background-color: #151f32; border: 1px solid #1e293b; border-radius: 1.5rem; }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center font-prompt selection:bg-blue-500/30 p-4 relative overflow-hidden">
+    
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-600/20 rounded-full blur-[120px] pointer-events-none"></div>
+
+    <div class="max-w-md w-full cyber-card shadow-[0_0_40px_rgba(59,130,246,0.15)] z-10 overflow-hidden">
+        <div class="p-8 text-center bg-[#0f172a] border-b border-darkborder">
+            <div class="w-20 h-20 mx-auto bg-blue-600/20 text-blue-400 border border-blue-500/50 rounded-2xl flex items-center justify-center text-4xl shadow-[0_0_15px_rgba(59,130,246,0.4)] mb-5">
+                <i class="fa-solid fa-industry"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-slate-200 uppercase tracking-wider drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]">DMS 4.0</h1>
+            <p class="text-sm text-slate-400 mt-2">Enterprise Asset Management</p>
+        </div>
+        
+        <div class="p-8 space-y-6">
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">เข้าสู่ระบบด้วยสิทธิ์จำลอง (Select Role)</label>
+                <div class="grid grid-cols-1 gap-4">
+                    <button onclick="loginAs('executive')" class="flex items-center p-4 border border-darkborder rounded-2xl hover:bg-blue-500/10 hover:border-blue-500/50 transition-all text-left group relative overflow-hidden">
+                        <div class="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 flex items-center justify-center mr-4 shrink-0 group-hover:shadow-[0_0_10px_rgba(59,130,246,0.3)] transition-all"><i class="fa-solid fa-user-tie text-xl"></i></div>
+                        <div><h4 class="font-bold text-slate-200 text-sm group-hover:text-blue-300 transition-colors">ผู้บริหาร / ผู้วางแผน (Executive)</h4><p class="text-[10px] text-slate-500 mt-0.5">สิทธิ์ดู Dashboard, KPI</p></div>
+                    </button>
+                    
+                    <button onclick="loginAs('production')" class="flex items-center p-4 border border-darkborder rounded-2xl hover:bg-emerald-500/10 hover:border-emerald-500/50 transition-all text-left group relative overflow-hidden">
+                        <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center mr-4 shrink-0 group-hover:shadow-[0_0_10px_rgba(52,211,153,0.3)] transition-all"><i class="fa-solid fa-users-gear text-xl"></i></div>
+                        <div><h4 class="font-bold text-slate-200 text-sm group-hover:text-emerald-300 transition-colors">ฝ่ายผลิต (Production)</h4><p class="text-[10px] text-slate-500 mt-0.5">สิทธิ์เปิดบิลแจ้งซ่อมแม่พิมพ์</p></div>
+                    </button>
+                    
+                    <button onclick="loginAs('technician')" class="flex items-center p-4 border border-darkborder rounded-2xl hover:bg-amber-500/10 hover:border-amber-500/50 transition-all text-left group relative overflow-hidden">
+                        <div class="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mr-4 shrink-0 group-hover:shadow-[0_0_10px_rgba(251,191,36,0.3)] transition-all"><i class="fa-solid fa-screwdriver-wrench text-xl"></i></div>
+                        <div><h4 class="font-bold text-slate-200 text-sm group-hover:text-amber-300 transition-colors">ช่างซ่อมบำรุง (Technician)</h4><p class="text-[10px] text-slate-500 mt-0.5">สิทธิ์รับงาน, บันทึกผลการซ่อม</p></div>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="flex items-center justify-between mt-6 pt-6 border-t border-darkborder">
+                <span class="text-[10px] text-slate-500">Local Data PoC Version</span>
+                <span class="text-xs text-slate-400 font-mono font-bold">v5.0 (Dark Theme)</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function loginAs(role) {
+            localStorage.setItem('user_role', role);
+            localStorage.setItem('user_name', role === 'executive' ? 'Admin' : (role === 'production' ? 'Suparuk' : 'Orachoon'));
+            if(role === 'executive') window.location.replace('page_dashboard.html');
+            else if(role === 'production') window.location.replace('page_request_form.html');
+            else if(role === 'technician') window.location.replace('page_job_queue.html');
+        }
+    </script>
+</body>
+</html>

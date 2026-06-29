@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="th" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reliability Dashboard - DMS 4.0</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script src="data_engine.js"></script>
+    <script>
+        tailwind.config = { 
+            darkMode: 'class', 
+            theme: { 
+                extend: { 
+                    fontFamily: { sans: ['Prompt', 'sans-serif'] },
+                    colors: { darkbg: '#0b1120', darkcard: '#151f32', darkborder: '#1e293b' }
+                } 
+            } 
+        };
+        
+        function checkAccess() {
+            const userRole = localStorage.getItem('user_role');
+            if (!userRole) { window.location.replace("page_login.html"); return; }
+        }
+        function handleLogout() {
+            if (confirm("คุณต้องการออกจากระบบใช่หรือไม่?")) { 
+                localStorage.removeItem('user_role');
+                window.location.replace("page_login.html"); 
+            }
+        }
+        function hideUnauthorizedMenus() {
+            const userRole = localStorage.getItem('user_role');
+            if (!userRole) return;
+            document.querySelectorAll('#main-nav a').forEach(link => {
+                const roles = link.getAttribute('data-roles');
+                if (roles && !roles.split(',').includes(userRole)) { link.style.display = 'none'; }
+            });
+            const currentPage = window.location.pathname.split("/").pop();
+            document.querySelectorAll('#main-nav a').forEach(link => {
+                if(link.getAttribute('href') === currentPage) {
+                    link.className = "bg-blue-600/20 text-blue-400 border border-blue-500/50 px-5 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all flex items-center shadow-[0_0_10px_rgba(59,130,246,0.3)]";
+                }
+            });
+        }
+        document.addEventListener('DOMContentLoaded', () => {
+            document.documentElement.classList.add('dark');
+            checkAccess(); hideUnauthorizedMenus();
+        });
+    </script>
+    <style>
+        body { background-color: #0b1120; color: #94a3b8; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .cyber-card { background-color: #151f32; border: 1px solid #1e293b; border-radius: 1rem; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col font-prompt selection:bg-blue-500/30">
+
+    <header class="bg-darkbg border-b border-darkborder sticky top-0 z-40 py-3" id="main-nav-bar">
+        <div class="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-14">
+                <div class="flex items-center space-x-3 shrink-0">
+                    <div class="w-10 h-10 rounded-xl bg-blue-900/30 flex items-center justify-center text-blue-400 text-xl border border-blue-500/30 shadow-[0_0_10px_rgba(59,130,246,0.2)]">
+                        <i class="fa-solid fa-gauge-high"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-slate-200 tracking-wider leading-tight text-sm uppercase">DMS 4.0</h1>
+                        <p class="text-[10px] text-slate-500">Reliability & Maintenance</p>
+                    </div>
+                </div>
+                
+                <div id="main-nav" class="hidden xl:flex items-center space-x-1 border border-darkborder rounded-xl p-1.5 bg-[#0f172a] shadow-inner mx-4 overflow-x-auto scrollbar-hide">
+                    <a href="page_dashboard.html" data-roles="executive" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-chart-pie mr-2"></i> Dashboard</a>
+                    <a href="page_reliability_dashboard.html" data-roles="executive" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-gauge-high mr-2"></i> Reliability</a>
+                    <a href="page_calendar.html" data-roles="executive,technician" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-regular fa-calendar mr-2"></i> Calendar</a>
+                    <a href="page_request_form.html" data-roles="executive,production" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-plus-square mr-2"></i> Request</a>
+                    <a href="page_job_queue.html" data-roles="executive,technician" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-list-ul mr-2"></i> Queue</a>
+                    <a href="page_status_tracking.html" data-roles="executive,production,technician" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-columns mr-2"></i> Status Board</a>
+                    <a href="page_kpi_analytics.html" data-roles="executive" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-chart-line mr-2"></i> KPIs</a>
+                    <a href="page_die_master.html" data-roles="executive,technician" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-database mr-2"></i> Die Master</a>
+                </div>
+
+                <div class="flex items-center space-x-2 shrink-0">
+                    <button onclick="handleLogout()" class="flex items-center text-rose-400 bg-rose-500/10 border border-rose-500/30 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all hover:bg-rose-500/20"><i class="fa-solid fa-right-from-bracket"></i></button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow p-4 lg:p-8 w-full max-w-[1800px] mx-auto overflow-y-auto">
+        <div class="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <h2 class="text-2xl font-bold text-slate-200 flex items-center gap-2">
+                    <i class="fa-solid fa-gauge-high text-blue-400"></i> สถิติความน่าเชื่อถือและการบำรุงรักษา (Reliability & Maintenance)
+                </h2>
+                <p class="text-sm text-slate-500 mt-1">วิเคราะห์แนวโน้มประสิทธิภาพของแม่พิมพ์ 15 วันย้อนหลัง (ข้อมูลจริงจาก Engine)</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div class="cyber-card p-6">
+                <div class="flex justify-between items-center mb-6 border-b border-darkborder pb-4">
+                    <h3 class="text-sm font-bold text-purple-400 uppercase tracking-wider flex items-center"><i class="fa-solid fa-heart-pulse mr-2"></i> ความทนทาน (MTBF)</h3>
+                    <span class="text-xs font-bold text-slate-400 border border-slate-700 px-3 py-1 rounded-md">หน่วย: นาที</span>
+                </div>
+                <div class="h-64"><canvas id="mtbfChart"></canvas></div>
+            </div>
+
+            <div class="cyber-card p-6">
+                <div class="flex justify-between items-center mb-6 border-b border-darkborder pb-4">
+                    <h3 class="text-sm font-bold text-pink-400 uppercase tracking-wider flex items-center"><i class="fa-solid fa-stopwatch mr-2"></i> ความเร็วในการซ่อม (MTTR)</h3>
+                    <span class="text-xs font-bold text-slate-400 border border-slate-700 px-3 py-1 rounded-md">หน่วย: นาที</span>
+                </div>
+                <div class="h-64"><canvas id="mttrChart"></canvas></div>
+            </div>
+
+            <div class="cyber-card p-6">
+                <div class="flex justify-between items-center mb-6 border-b border-darkborder pb-4">
+                    <h3 class="text-sm font-bold text-blue-400 uppercase tracking-wider flex items-center"><i class="fa-solid fa-triangle-exclamation mr-2"></i> งานแจ้งซ่อม (BM & PM)</h3>
+                    <span class="text-xs font-bold text-slate-400 border border-slate-700 px-3 py-1 rounded-md">หน่วย: ใบงาน</span>
+                </div>
+                <div class="h-64"><canvas id="bmChart"></canvas></div>
+            </div>
+
+            <div class="cyber-card p-6">
+                <div class="flex justify-between items-center mb-6 border-b border-darkborder pb-4">
+                    <h3 class="text-sm font-bold text-teal-400 uppercase tracking-wider flex items-center"><i class="fa-solid fa-clock-rotate-left mr-2"></i> เวลารวมการซ่อมบำรุง (Repair Minutes Trend)</h3>
+                    <span class="text-xs font-bold text-slate-400 border border-slate-700 px-3 py-1 rounded-md">หน่วย: นาที</span>
+                </div>
+                <div class="h-64"><canvas id="minsChart"></canvas></div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let mtbfChart, mttrChart, bmChart, minsChart;
+
+        function initCharts() {
+            const gridColor = '#1e293b';
+            const textColor = '#64748b';
+            const fontConfig = { family: 'Prompt', size: 10 };
+            
+            const commonOptions = {
+                responsive: true, maintainAspectRatio: false,
+                scales: {
+                    x: { grid: { display: false }, ticks: { color: textColor, font: fontConfig } },
+                    y: { grid: { color: gridColor, drawBorder: false }, ticks: { color: textColor, font: fontConfig } }
+                },
+                plugins: { legend: { display: false } }
+            };
+
+            const kpis = typeof fetchAndCalculateKPIs === 'function' ? fetchAndCalculateKPIs() : null;
+            if(!kpis) return;
+            const t = kpis.trend;
+
+            mtbfChart = new Chart(document.getElementById('mtbfChart'), {
+                type: 'line',
+                data: { labels: t.labels, datasets: [{ label: 'MTBF (นาที)', data: t.mtbfSeries, borderColor: '#c084fc', backgroundColor: 'rgba(192, 132, 252, 0.2)', borderWidth: 3, fill: true, tension: 0.4 }] },
+                options: commonOptions
+            });
+
+            mttrChart = new Chart(document.getElementById('mttrChart'), {
+                type: 'line',
+                data: { labels: t.labels, datasets: [{ label: 'MTTR (นาที)', data: t.mttrSeries, borderColor: '#f472b6', backgroundColor: 'rgba(244, 114, 182, 0.2)', borderWidth: 3, fill: true, tension: 0.4 }] },
+                options: commonOptions
+            });
+
+            bmChart = new Chart(document.getElementById('bmChart'), {
+                type: 'bar',
+                data: { labels: t.labels, datasets: [
+                    { label: 'BM (ฉุกเฉิน)', data: t.breakdownSeries, backgroundColor: 'rgba(249, 115, 22, 0.8)', borderColor: '#f97316', borderWidth: 1, borderRadius: 2 },
+                    { label: 'PM (ตามรอบ)', data: t.pmSeries, backgroundColor: 'rgba(52, 211, 153, 0.8)', borderColor: '#34d399', borderWidth: 1, borderRadius: 2 }
+                ]},
+                options: { 
+                    ...commonOptions, 
+                    plugins: { legend: { display: true, labels: { color: '#94a3b8', font: { family: 'Prompt' } } } },
+                    scales: { 
+                        x: { stacked: true, grid: { display: false }, ticks: { color: textColor } }, 
+                        y: { stacked: true, grid: { color: gridColor, drawBorder: false }, ticks: { color: textColor } } 
+                    } 
+                }
+            });
+
+            minsChart = new Chart(document.getElementById('minsChart'), {
+                type: 'bar',
+                data: { labels: t.labels, datasets: [{ label: 'Repair Mins', data: t.repairMinutesSeries, backgroundColor: 'rgba(45, 212, 191, 0.8)', borderColor: '#2dd4bf', borderWidth: 1, borderRadius: 2 }] },
+                options: commonOptions
+            });
+        }
+
+        window.addEventListener('DOMContentLoaded', () => { setTimeout(initCharts, 100); });
+    </script>
+</body>
+</html>

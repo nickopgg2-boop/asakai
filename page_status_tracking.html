@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="th" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Status Tracking - DMS 4.0</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script src="data_engine.js"></script>
+    <script>
+        tailwind.config = { 
+            darkMode: 'class', 
+            theme: { 
+                extend: { 
+                    fontFamily: { sans: ['Prompt', 'sans-serif'] },
+                    colors: { darkbg: '#0b1120', darkcard: '#151f32', darkborder: '#1e293b' }
+                } 
+            } 
+        };
+        
+        function checkAccess() {
+            const userRole = localStorage.getItem('user_role');
+            if (!userRole) { window.location.replace("page_login.html"); return; }
+        }
+        function handleLogout() {
+            if (confirm("คุณต้องการออกจากระบบใช่หรือไม่?")) { 
+                localStorage.removeItem('user_role');
+                window.location.replace("page_login.html"); 
+            }
+        }
+        function hideUnauthorizedMenus() {
+            const userRole = localStorage.getItem('user_role');
+            if (!userRole) return;
+            document.querySelectorAll('#main-nav a').forEach(link => {
+                const roles = link.getAttribute('data-roles');
+                if (roles && !roles.split(',').includes(userRole)) { link.style.display = 'none'; }
+            });
+            const currentPage = window.location.pathname.split("/").pop();
+            document.querySelectorAll('#main-nav a').forEach(link => {
+                if(link.getAttribute('href') === currentPage) {
+                    link.className = "bg-blue-600/20 text-blue-400 border border-blue-500/50 px-5 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all flex items-center shadow-[0_0_10px_rgba(59,130,246,0.3)]";
+                }
+            });
+        }
+        function toggleAndonMode() {
+            document.body.classList.toggle('andon-mode');
+        }
+        document.addEventListener('DOMContentLoaded', () => {
+            document.documentElement.classList.add('dark');
+            checkAccess(); hideUnauthorizedMenus();
+        });
+    </script>
+    <style>
+        body { background-color: #0b1120; color: #94a3b8; }
+        .kanban-col { height: calc(100vh - 270px); min-height: 500px; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .cyber-card { background-color: #151f32; border: 1px solid #1e293b; border-radius: 1rem; }
+        
+        /* สไตล์สำหรับโหมด TV (Andon) */
+        .andon-mode header { display: none !important; }
+        .andon-mode .filter-section { display: none !important; }
+        .andon-mode main { max-width: 100% !important; width: 100% !important; padding: 1.5rem !important; }
+        .andon-mode .kanban-col { height: calc(100vh - 150px); }
+        .andon-mode #exitAndonBtn { display: flex !important; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col font-prompt selection:bg-blue-500/30">
+
+    <button id="exitAndonBtn" onclick="toggleAndonMode()" class="hidden fixed bottom-4 right-4 z-50 bg-rose-600 hover:bg-rose-500 text-white px-5 py-3 rounded-xl text-xs font-bold shadow-[0_0_15px_rgba(225,29,72,0.5)] items-center gap-2 transition-all">
+        <i class="fa-solid fa-screen-users text-sm"></i> ออกจากโหมด TV
+    </button>
+
+    <header class="bg-darkbg border-b border-darkborder sticky top-0 z-40 py-3" id="main-nav-bar">
+        <div class="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-14">
+                <div class="flex items-center space-x-3 shrink-0">
+                    <div class="w-10 h-10 rounded-xl bg-blue-900/30 flex items-center justify-center text-blue-400 text-xl border border-blue-500/30 shadow-[0_0_10px_rgba(59,130,246,0.2)]">
+                        <i class="fa-solid fa-columns"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-slate-200 tracking-wider leading-tight text-sm uppercase">DMS 4.0</h1>
+                        <p class="text-[10px] text-slate-500">Live Status Tracking</p>
+                    </div>
+                </div>
+                
+                <div id="main-nav" class="hidden xl:flex items-center space-x-1 border border-darkborder rounded-xl p-1.5 bg-[#0f172a] shadow-inner mx-4 overflow-x-auto scrollbar-hide">
+                    <a href="page_dashboard.html" data-roles="executive" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-chart-pie mr-2"></i> Dashboard</a>
+                    <a href="page_reliability_dashboard.html" data-roles="executive" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-gauge-high mr-2"></i> Reliability</a>
+                    <a href="page_calendar.html" data-roles="executive,technician" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-regular fa-calendar mr-2"></i> Calendar</a>
+                    <a href="page_request_form.html" data-roles="executive,production" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-plus-square mr-2"></i> Request</a>
+                    <a href="page_job_queue.html" data-roles="executive,technician" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-list-ul mr-2"></i> Queue</a>
+                    <a href="page_status_tracking.html" data-roles="executive,production,technician" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-columns mr-2"></i> Status Board</a>
+                    <a href="page_kpi_analytics.html" data-roles="executive" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-chart-line mr-2"></i> KPIs</a>
+                    <a href="page_die_master.html" data-roles="executive,technician" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-database mr-2"></i> Die Master</a>
+                </div>
+
+                <div class="flex items-center space-x-2 shrink-0">
+                    <button onclick="handleLogout()" class="flex items-center text-rose-400 bg-rose-500/10 border border-rose-500/30 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all hover:bg-rose-500/20"><i class="fa-solid fa-right-from-bracket mr-1.5"></i> <span class="hidden sm:inline">ออกจากระบบ</span></button>
+                    <button onclick="toggleAndonMode()" class="hidden sm:flex items-center text-blue-400 bg-blue-500/10 border border-blue-500/30 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all hover:bg-blue-500/20"><i class="fa-solid fa-tv mr-1.5"></i> โหมด TV</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 p-4 lg:p-8 space-y-6 overflow-hidden max-w-[1800px] mx-auto w-full flex flex-col">
+        
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 filter-section shrink-0">
+            <div class="cyber-card p-4 flex items-center justify-between">
+                <div><p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">รอมอบหมาย (Pending)</p><h3 class="text-2xl font-bold text-slate-200 font-mono"><span id="sum-pending">0</span></h3></div>
+                <div class="w-10 h-10 rounded-full bg-slate-800/50 text-slate-400 flex items-center justify-center text-xl border border-slate-700"><i class="fa-solid fa-inbox"></i></div>
+            </div>
+            <div class="bg-blue-600/20 border border-blue-500/50 text-blue-400 p-4 rounded-2xl flex items-center justify-between shadow-[0_0_15px_rgba(59,130,246,0.3)]">
+                <div><p class="text-[10px] font-bold uppercase tracking-wider mb-1">กำลังซ่อม (In Progress)</p><h3 class="text-2xl font-bold text-blue-400 font-mono drop-shadow-[0_0_5px_rgba(59,130,246,0.8)]"><span id="sum-progress">0</span></h3></div>
+                <div class="w-10 h-10 rounded-full bg-blue-500/30 flex items-center justify-center text-xl animate-pulse"><i class="fa-solid fa-wrench"></i></div>
+            </div>
+            <div class="cyber-card p-4 flex items-center justify-between">
+                <div><p class="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1">เสร็จสิ้น (Closed)</p><h3 class="text-2xl font-bold text-emerald-400 font-mono drop-shadow-[0_0_5px_rgba(52,211,153,0.5)]"><span id="sum-closed">0</span></h3></div>
+                <div class="w-10 h-10 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center text-xl border border-emerald-500/30"><i class="fa-solid fa-check-double"></i></div>
+            </div>
+        </div>
+
+        <div class="flex-1 overflow-x-auto pb-4 scrollbar-hide">
+            <div class="flex gap-4 min-w-[800px] h-full">
+                
+                <div class="flex-1 bg-darkbg rounded-2xl flex flex-col border border-darkborder overflow-hidden">
+                    <div class="p-3 bg-darkcard border-b border-darkborder flex justify-between items-center shrink-0">
+                        <h3 class="font-bold text-slate-300 text-sm flex items-center gap-2"><i class="fa-solid fa-inbox text-slate-500"></i> รอมอบหมาย</h3>
+                    </div>
+                    <div class="p-3 overflow-y-auto kanban-col space-y-3 scrollbar-hide" id="col-pending"></div>
+                </div>
+
+                <div class="flex-1 bg-blue-900/10 rounded-2xl flex flex-col border border-blue-900/50 overflow-hidden shadow-[inset_0_0_20px_rgba(59,130,246,0.05)]">
+                    <div class="p-3 bg-blue-900/30 border-b border-blue-800/50 flex justify-between items-center shrink-0">
+                        <h3 class="font-bold text-blue-400 text-sm flex items-center gap-2 drop-shadow-[0_0_5px_rgba(59,130,246,0.5)]"><i class="fa-solid fa-wrench"></i> กำลังซ่อม</h3>
+                    </div>
+                    <div class="p-3 overflow-y-auto kanban-col space-y-3 scrollbar-hide" id="col-progress"></div>
+                </div>
+
+                <div class="flex-1 bg-emerald-900/10 rounded-2xl flex flex-col border border-emerald-900/50 overflow-hidden">
+                    <div class="p-3 bg-emerald-900/30 border-b border-emerald-800/50 flex justify-between items-center shrink-0">
+                        <h3 class="font-bold text-emerald-400 text-sm flex items-center gap-2"><i class="fa-solid fa-check-double"></i> เสร็จสิ้น</h3>
+                    </div>
+                    <div class="p-3 overflow-y-auto kanban-col space-y-3 scrollbar-hide" id="col-closed"></div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <script>
+        function createCardHTML(job) {
+            const isUrgent = job.priority === 'ด่วน';
+            const isPM = job.jobType === 'PM';
+            
+            let deptColorText = job.dept === 'L-D' ? 'text-orange-400' : (job.dept === 'P-D' ? 'text-purple-400' : 'text-blue-400');
+            let deptColorBg = job.dept === 'L-D' ? 'bg-orange-500/10 border-orange-500/30' : (job.dept === 'P-D' ? 'bg-purple-500/10 border-purple-500/30' : 'bg-blue-500/10 border-blue-500/30');
+            
+            let borderColor = isUrgent ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)]' : (isPM ? 'bg-emerald-500' : 'bg-blue-500');
+
+            return `
+                <div class="cyber-card p-3 relative overflow-hidden transition-colors hover:bg-slate-800/50">
+                    <div class="absolute top-0 left-0 w-1 h-full ${borderColor}"></div>
+                    <div class="pl-2">
+                        <div class="flex justify-between items-start mb-1.5">
+                            <span class="font-mono font-bold text-slate-300 text-[11px]">${job.jobId}</span>
+                            ${isUrgent ? '<span class="text-[9px] font-bold text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/30 shadow-[0_0_5px_rgba(244,63,94,0.3)]">ด่วน</span>' : ''}
+                        </div>
+                        <div class="flex items-center gap-1.5 mb-1">
+                            <span class="text-[9px] font-bold ${deptColorText} ${deptColorBg} px-1.5 py-0.5 rounded border">${job.dept}</span>
+                            <span class="font-bold text-slate-200 text-xs">${job.dieId}</span>
+                        </div>
+                        <p class="text-[10px] text-slate-400 line-clamp-2 mt-1" title="${job.defect}">${job.defect}</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderBoard() {
+            let dbJobs = typeof getAllJobs === 'function' ? getAllJobs() : [];
+
+            const colPending = document.getElementById('col-pending');
+            const colInProgress = document.getElementById('col-progress');
+            const colClosed = document.getElementById('col-closed');
+
+            colPending.innerHTML = '';
+            colInProgress.innerHTML = '';
+            colClosed.innerHTML = '';
+
+            let cPending = 0, cProgress = 0, cClosed = 0;
+
+            dbJobs.forEach(job => {
+                const cardHtml = createCardHTML(job);
+                if (job.status === 'pending' || job.status === 'to_do') {
+                    colPending.innerHTML += cardHtml; cPending++;
+                } else if (job.status === 'in_progress') {
+                    colInProgress.innerHTML += cardHtml; cProgress++;
+                } else if (job.status === 'closed' || job.status === 'done') {
+                    colClosed.innerHTML += cardHtml; cClosed++;
+                }
+            });
+
+            document.getElementById('sum-pending').innerText = cPending;
+            document.getElementById('sum-progress').innerText = cProgress;
+            document.getElementById('sum-closed').innerText = cClosed;
+        }
+
+        window.addEventListener('DOMContentLoaded', () => { 
+            setTimeout(() => { renderBoard(); setInterval(renderBoard, 3000); }, 200); 
+        });
+    </script>
+</body>
+</html>

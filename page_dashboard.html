@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="th" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - DMS 4.0</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script src="data_engine.js"></script>
+    <script>
+        tailwind.config = { 
+            darkMode: 'class', 
+            theme: { 
+                extend: { 
+                    fontFamily: { sans: ['Prompt', 'sans-serif'] },
+                    colors: { darkbg: '#0b1120', darkcard: '#151f32', darkborder: '#1e293b' }
+                } 
+            } 
+        };
+        
+        function checkAccess() {
+            const userRole = localStorage.getItem('user_role');
+            if (!userRole) { window.location.replace("page_login.html"); return; }
+        }
+        function handleLogout() {
+            if (confirm("คุณต้องการออกจากระบบใช่หรือไม่?")) { 
+                localStorage.removeItem('user_role');
+                window.location.replace("page_login.html"); 
+            }
+        }
+        function hideUnauthorizedMenus() {
+            const userRole = localStorage.getItem('user_role');
+            if (!userRole) return;
+            document.querySelectorAll('#main-nav a').forEach(link => {
+                const roles = link.getAttribute('data-roles');
+                if (roles && !roles.split(',').includes(userRole)) { link.style.display = 'none'; }
+            });
+            const currentPage = window.location.pathname.split("/").pop();
+            document.querySelectorAll('#main-nav a').forEach(link => {
+                if(link.getAttribute('href') === currentPage) {
+                    link.className = "bg-blue-600/20 text-blue-400 border border-blue-500/50 px-5 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all flex items-center shadow-[0_0_10px_rgba(59,130,246,0.3)]";
+                }
+            });
+        }
+        document.addEventListener('DOMContentLoaded', () => {
+            document.documentElement.classList.add('dark');
+            checkAccess(); hideUnauthorizedMenus();
+        });
+    </script>
+    <style>
+        body { background-color: #0b1120; color: #94a3b8; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .cyber-card { background-color: #151f32; border: 1px solid #1e293b; border-radius: 1rem; }
+        input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; filter: invert(1); }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col font-prompt selection:bg-blue-500/30">
+
+    <header class="bg-darkbg border-b border-darkborder sticky top-0 z-40 py-3" id="main-nav-bar">
+        <div class="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-14">
+                <div class="flex items-center space-x-3 shrink-0">
+                    <div class="w-10 h-10 rounded-xl bg-blue-900/30 flex items-center justify-center text-blue-400 text-xl border border-blue-500/30 shadow-[0_0_10px_rgba(59,130,246,0.2)]">
+                        <i class="fa-solid fa-industry"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-slate-200 tracking-wider leading-tight text-sm uppercase">DMS 4.0</h1>
+                        <p class="text-[10px] text-slate-500">Enterprise Asset Management</p>
+                    </div>
+                </div>
+                
+                <div id="main-nav" class="hidden xl:flex items-center space-x-1 border border-darkborder rounded-xl p-1.5 bg-[#0f172a] shadow-inner mx-4 overflow-x-auto scrollbar-hide">
+                    <a href="page_dashboard.html" data-roles="executive" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-chart-pie mr-2"></i> Dashboard</a>
+                    <a href="page_reliability_dashboard.html" data-roles="executive" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-gauge-high mr-2"></i> Reliability</a>
+                    <a href="page_calendar.html" data-roles="executive,technician" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-regular fa-calendar mr-2"></i> Calendar</a>
+                    <a href="page_request_form.html" data-roles="executive,production" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-plus-square mr-2"></i> Request</a>
+                    <a href="page_job_queue.html" data-roles="executive,technician" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-list-ul mr-2"></i> Queue</a>
+                    <a href="page_status_tracking.html" data-roles="executive,production,technician" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-columns mr-2"></i> Status Board</a>
+                    <a href="page_kpi_analytics.html" data-roles="executive" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-chart-line mr-2"></i> KPIs</a>
+                    <a href="page_die_master.html" data-roles="executive,technician" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-database mr-2"></i> Die Master</a>
+                </div>
+
+                <div class="flex items-center space-x-2 shrink-0">
+                    <button onclick="handleLogout()" class="flex items-center text-rose-400 bg-rose-500/10 border border-rose-500/30 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all hover:bg-rose-500/20"><i class="fa-solid fa-right-from-bracket mr-1.5"></i> <span class="hidden sm:inline">ออกจากระบบ</span></button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 p-4 lg:p-8 space-y-6 overflow-y-auto max-w-[1800px] mx-auto w-full">
+        
+        <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-2">
+            <div>
+                <h2 class="text-2xl font-bold text-slate-200 flex items-center gap-2">
+                    <i class="fa-solid fa-chart-pie text-blue-400"></i> ภาพรวมระบบซ่อมบำรุงแม่พิมพ์
+                </h2>
+                <p class="text-sm text-slate-500 mt-1">ข้อมูลสรุปสถิติตามช่วงเวลาที่คุณเลือก</p>
+            </div>
+            
+            <div class="flex flex-wrap items-center gap-2 bg-[#0f172a] p-2 rounded-2xl border border-darkborder">
+                <span class="text-xs font-bold text-slate-400 mx-2"><i class="fa-solid fa-filter mr-1"></i> กรองวันที่:</span>
+                <input type="date" id="filterStart" class="bg-darkcard text-slate-200 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono outline-none focus:border-blue-500">
+                <span class="text-slate-500">-</span>
+                <input type="date" id="filterEnd" class="bg-darkcard text-slate-200 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono outline-none focus:border-blue-500">
+                <button onclick="applyDateFilter()" class="bg-blue-600/20 border border-blue-500/50 text-blue-400 hover:bg-blue-500/30 px-4 py-2 rounded-xl text-xs font-bold shadow-[0_0_10px_rgba(59,130,246,0.3)] transition-all">ค้นหา</button>
+                <button onclick="resetDateFilter()" class="bg-slate-800 border border-slate-700 text-slate-400 hover:text-slate-200 hover:bg-slate-700 px-3 py-2 rounded-xl text-xs font-bold transition-all"><i class="fa-solid fa-rotate-left"></i></button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div class="cyber-card p-6 flex flex-col h-48 relative">
+                <h5 class="text-[10px] font-bold text-blue-400 uppercase tracking-wider mb-2 flex items-center"><i class="fa-solid fa-bolt mr-2"></i>แผนก S-D (SMALL DIE) จำนวนใบงานซ่อม</h5>
+                <div class="border-b border-darkborder w-full mb-auto mt-2"></div>
+                <div class="flex items-baseline justify-center gap-2 mt-auto mb-4 w-full text-center">
+                    <div class="font-mono text-5xl font-bold text-blue-400 drop-shadow-[0_0_8px_rgba(59,130,246,0.8)]" id="sd-count">0</div>
+                    <div class="text-lg text-blue-400 font-bold">ใบงาน</div>
+                </div>
+            </div>
+            
+            <div class="cyber-card p-6 flex flex-col h-48 relative">
+                <h5 class="text-[10px] font-bold text-orange-400 uppercase tracking-wider mb-2 flex items-center"><i class="fa-solid fa-cubes mr-2"></i>แผนก L-D (LARGE DIE) จำนวนใบงานซ่อม</h5>
+                <div class="border-b border-darkborder w-full mb-auto mt-2"></div>
+                <div class="flex items-baseline justify-center gap-2 mt-auto mb-4 w-full text-center">
+                    <div class="font-mono text-5xl font-bold text-orange-400 drop-shadow-[0_0_8px_rgba(249,115,22,0.8)]" id="ld-count">0</div>
+                    <div class="text-lg text-orange-400 font-bold">ใบงาน</div>
+                </div>
+            </div>
+            
+            <div class="cyber-card p-6 flex flex-col h-48 relative">
+                <h5 class="text-[10px] font-bold text-purple-400 uppercase tracking-wider mb-2 flex items-center"><i class="fa-solid fa-layer-group mr-2"></i>แผนก P-D (PROGRESSIVE DIE) จำนวนใบงานซ่อม</h5>
+                <div class="border-b border-darkborder w-full mb-auto mt-2"></div>
+                <div class="flex items-baseline justify-center gap-2 mt-auto mb-4 w-full text-center">
+                    <div class="font-mono text-5xl font-bold text-purple-400 drop-shadow-[0_0_8px_rgba(168,85,247,0.8)]" id="pd-count">0</div>
+                    <div class="text-lg text-purple-400 font-bold">ใบงาน</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-4">
+            <div class="cyber-card p-4 text-center">
+                <p class="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-2">Total Jobs</p>
+                <h3 class="text-2xl font-bold text-slate-200 font-mono" id="m-total">0</h3>
+            </div>
+            <div class="cyber-card p-4 text-center">
+                <p class="text-[10px] text-emerald-400 uppercase font-bold tracking-wider mb-2">Closed Jobs</p>
+                <h3 class="text-2xl font-bold text-emerald-400 font-mono drop-shadow-[0_0_5px_rgba(52,211,153,0.5)]" id="m-closed">0</h3>
+            </div>
+            <div class="cyber-card p-4 text-center">
+                <p class="text-[10px] text-amber-400 uppercase font-bold tracking-wider mb-2">Breakdowns</p>
+                <h3 class="text-2xl font-bold text-amber-400 font-mono drop-shadow-[0_0_5px_rgba(251,191,36,0.5)]" id="m-bm">0</h3>
+            </div>
+            <div class="cyber-card p-4 text-center">
+                <p class="text-[10px] text-rose-400 uppercase font-bold tracking-wider mb-2">Repair Mins</p>
+                <h3 class="text-2xl font-bold text-rose-400 font-mono drop-shadow-[0_0_5px_rgba(244,63,94,0.5)]" id="m-mins">0</h3>
+            </div>
+            <div class="cyber-card p-4 text-center">
+                <p class="text-[10px] text-sky-400 uppercase font-bold tracking-wider mb-2">Avg MTTR</p>
+                <h3 class="text-2xl font-bold text-sky-400 font-mono drop-shadow-[0_0_5px_rgba(56,189,248,0.5)]" id="m-mttr">0</h3>
+            </div>
+            <div class="cyber-card p-4 text-center">
+                <p class="text-[10px] text-purple-400 uppercase font-bold tracking-wider mb-2">Avg MTBF</p>
+                <h3 class="text-2xl font-bold text-purple-400 font-mono drop-shadow-[0_0_5px_rgba(168,85,247,0.5)]" id="m-mtbf">0</h3>
+            </div>
+        </div>
+
+        <div class="cyber-card p-6">
+            <div class="flex justify-between items-center mb-6 border-b border-darkborder pb-4">
+                <h4 class="text-sm font-bold uppercase tracking-wider text-slate-300 flex items-center"><i class="fa-solid fa-chart-column mr-2 text-blue-400"></i>จำนวนงานแจ้งซ่อมรวมรายวัน (Daily Breakdowns)</h4>
+            </div>
+            <div class="h-64 sm:h-80"><canvas id="mainChart"></canvas></div>
+        </div>
+    </main>
+
+    <script>
+        Chart.register(ChartDataLabels);
+        let mainChart;
+
+        function applyDateFilter() {
+            const start = document.getElementById('filterStart').value;
+            const end = document.getElementById('filterEnd').value;
+            initDashboard(start, end);
+        }
+
+        function resetDateFilter() {
+            document.getElementById('filterStart').value = '';
+            document.getElementById('filterEnd').value = '';
+            initDashboard();
+        }
+
+        function initDashboard(startDate = null, endDate = null) {
+            const kpis = typeof fetchAndCalculateKPIs === 'function' ? fetchAndCalculateKPIs(startDate, endDate) : null;
+            if(!kpis) return;
+            
+            document.getElementById('m-total').innerText = kpis.overall.totalJobs;
+            document.getElementById('m-closed').innerText = kpis.overall.totalClosedJobs;
+            document.getElementById('m-bm').innerText = kpis.overall.totalBreakdowns;
+            document.getElementById('m-mins').innerText = kpis.overall.totalRepairMinutes;
+            document.getElementById('m-mttr').innerText = kpis.overall.avgMTTR;
+            document.getElementById('m-mtbf').innerText = kpis.overall.avgMTBF;
+
+            document.getElementById('sd-count').innerText = kpis.byDept['S-D'] ? kpis.byDept['S-D'].breakdowns : 0;
+            document.getElementById('ld-count').innerText = kpis.byDept['L-D'] ? kpis.byDept['L-D'].breakdowns : 0;
+            document.getElementById('pd-count').innerText = kpis.byDept['P-D'] ? kpis.byDept['P-D'].breakdowns : 0;
+
+            const gridColor = '#1e293b';
+            const textColor = '#64748b';
+
+            if(mainChart) mainChart.destroy();
+
+            mainChart = new Chart(document.getElementById('mainChart'), {
+                type: 'bar',
+                data: { labels: kpis.trend.labels, datasets: [
+                    { label: 'BM (ฉุกเฉิน)', data: kpis.trend.breakdownSeries, backgroundColor: 'rgba(249, 115, 22, 0.8)', borderColor: '#f97316', borderWidth: 1, borderRadius: 2 },
+                    { label: 'PM (ตามรอบ)', data: kpis.trend.pmSeries, backgroundColor: 'rgba(52, 211, 153, 0.8)', borderColor: '#34d399', borderWidth: 1, borderRadius: 2 }
+                ]},
+                options: { 
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        x: { stacked: true, grid: { display: false }, ticks: { color: textColor, font: { family: 'Prompt' } } },
+                        y: { stacked: true, grid: { color: gridColor, drawBorder: false }, ticks: { color: textColor } }
+                    },
+                    plugins: { 
+                        legend: { display: true, labels: { color: '#94a3b8', font: { family: 'Prompt' } } }, 
+                        datalabels: { color: '#ffffff', font: { weight: 'bold' }, formatter: (v) => v > 0 ? v : '' } 
+                    }
+                }
+            });
+        }
+
+        window.addEventListener('DOMContentLoaded', () => { setTimeout(() => initDashboard(), 100); });
+    </script>
+</body>
+</html>

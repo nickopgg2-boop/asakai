@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="th" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Die Master - DMS 4.0</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script src="data_engine.js"></script>
+    <script>
+        tailwind.config = { 
+            darkMode: 'class', 
+            theme: { 
+                extend: { 
+                    fontFamily: { sans: ['Prompt', 'sans-serif'] },
+                    colors: { darkbg: '#0b1120', darkcard: '#151f32', darkborder: '#1e293b' }
+                } 
+            } 
+        };
+        
+        function checkAccess() {
+            const userRole = localStorage.getItem('user_role');
+            if (!userRole) { window.location.replace("page_login.html"); return; }
+        }
+        function handleLogout() {
+            if (confirm("คุณต้องการออกจากระบบใช่หรือไม่?")) { 
+                localStorage.removeItem('user_role');
+                window.location.replace("page_login.html"); 
+            }
+        }
+        function hideUnauthorizedMenus() {
+            const userRole = localStorage.getItem('user_role');
+            if (!userRole) return;
+            document.querySelectorAll('#main-nav a').forEach(link => {
+                const roles = link.getAttribute('data-roles');
+                if (roles && !roles.split(',').includes(userRole)) { link.style.display = 'none'; }
+            });
+            const currentPage = window.location.pathname.split("/").pop();
+            document.querySelectorAll('#main-nav a').forEach(link => {
+                if(link.getAttribute('href') === currentPage) {
+                    link.className = "bg-blue-600/20 text-blue-400 border border-blue-500/50 px-5 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all flex items-center shadow-[0_0_10px_rgba(59,130,246,0.3)]";
+                }
+            });
+        }
+        document.addEventListener('DOMContentLoaded', () => {
+            document.documentElement.classList.add('dark');
+            checkAccess(); hideUnauthorizedMenus();
+        });
+    </script>
+    <style>
+        body { background-color: #0b1120; color: #94a3b8; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .cyber-card { background-color: #151f32; border: 1px solid #1e293b; border-radius: 1rem; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col font-prompt selection:bg-blue-500/30">
+
+    <header class="bg-darkbg border-b border-darkborder sticky top-0 z-40 py-3" id="main-nav-bar">
+        <div class="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-14">
+                <div class="flex items-center space-x-3 shrink-0">
+                    <div class="w-10 h-10 rounded-xl bg-blue-900/30 flex items-center justify-center text-blue-400 text-xl border border-blue-500/30 shadow-[0_0_10px_rgba(59,130,246,0.2)]">
+                        <i class="fa-solid fa-database"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-slate-200 tracking-wider leading-tight text-sm uppercase">DMS 4.0</h1>
+                        <p class="text-[10px] text-slate-500">Die Master Registry</p>
+                    </div>
+                </div>
+                
+                <div id="main-nav" class="hidden xl:flex items-center space-x-1 border border-darkborder rounded-xl p-1.5 bg-[#0f172a] shadow-inner mx-4 overflow-x-auto scrollbar-hide">
+                    <a href="page_dashboard.html" data-roles="executive" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-chart-pie mr-2"></i> Dashboard</a>
+                    <a href="page_reliability_dashboard.html" data-roles="executive" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-gauge-high mr-2"></i> Reliability</a>
+                    <a href="page_calendar.html" data-roles="executive,technician" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-regular fa-calendar mr-2"></i> Calendar</a>
+                    <a href="page_request_form.html" data-roles="executive,production" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-plus-square mr-2"></i> Request</a>
+                    <a href="page_job_queue.html" data-roles="executive,technician" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-list-ul mr-2"></i> Queue</a>
+                    <a href="page_status_tracking.html" data-roles="executive,production,technician" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-columns mr-2"></i> Status Board</a>
+                    <a href="page_kpi_analytics.html" data-roles="executive" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-chart-line mr-2"></i> KPIs</a>
+                    <a href="page_die_master.html" data-roles="executive,technician" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-database mr-2"></i> Die Master</a>
+                </div>
+
+                <div class="flex items-center space-x-2 shrink-0">
+                    <button onclick="handleLogout()" class="flex items-center text-rose-400 bg-rose-500/10 border border-rose-500/30 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all hover:bg-rose-500/20"><i class="fa-solid fa-right-from-bracket"></i></button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1800px] mx-auto w-full">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
+            <h2 class="text-2xl font-bold text-slate-200 flex items-center gap-2">
+                <i class="fa-solid fa-database text-blue-400"></i> ทำเนียบประวัติแม่พิมพ์
+            </h2>
+            <button onclick="exportToExcel()" class="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:text-emerald-300 px-5 py-2.5 rounded-xl text-xs font-bold shadow-[0_0_10px_rgba(52,211,153,0.2)] hover:bg-emerald-500/20 transition-colors flex items-center gap-2">
+                <i class="fa-solid fa-file-excel"></i> โหลดเป็น Excel
+            </button>
+        </div>
+
+        <div class="cyber-card overflow-hidden">
+            <div class="overflow-x-auto text-sm">
+                <table class="w-full text-left border-collapse whitespace-nowrap">
+                    <thead>
+                        <tr class="bg-[#0f172a] text-slate-400 font-bold border-b border-darkborder uppercase tracking-wider text-xs">
+                            <th class="p-5">รหัสแม่พิมพ์ (Die ID)</th>
+                            <th class="p-5 text-center">จำนวนที่ซ่อม (Breakdowns)</th>
+                            <th class="p-5 text-center">เวลาซ่อมสะสม (นาที)</th>
+                            <th class="p-5 text-center">Avg MTTR (นาที)</th>
+                            <th class="p-5 text-center">Est. MTBF (นาที)</th>
+                            <th class="p-5 text-right">ประเมินสถานะความเสี่ยง</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dieTableBody" class="divide-y divide-darkborder text-slate-300 font-medium"></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let dieDataList = [];
+
+        window.onload = () => {
+            const kpis = typeof fetchAndCalculateKPIs === 'function' ? fetchAndCalculateKPIs() : null;
+            if(!kpis) return;
+
+            const badActors = kpis.topBadActors;
+            dieDataList = badActors; 
+            const tbody = document.getElementById('dieTableBody');
+            
+            if(badActors.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-slate-500 font-bold">ไม่มีข้อมูลแม่พิมพ์ในระบบ (กรุณาเพิ่มใบแจ้งซ่อม)</td></tr>';
+            } else {
+                badActors.forEach(die => {
+                    let riskHtml = `<span class="text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 rounded-lg text-xs font-bold drop-shadow-[0_0_5px_rgba(52,211,153,0.5)]"><i class="fa-solid fa-shield-heart mr-1"></i>ปกติแข็งแรงดี</span>`;
+                    
+                    if (die.mtbfEstimate < 200) riskHtml = `<span class="text-rose-400 bg-rose-500/10 border border-rose-500/30 px-3 py-1.5 rounded-lg text-xs font-bold drop-shadow-[0_0_5px_rgba(244,63,94,0.5)]"><i class="fa-solid fa-circle-radiation mr-1"></i>วิกฤต (ต้อง Modify)</span>`;
+                    else if (die.mtbfEstimate < 400) riskHtml = `<span class="text-amber-400 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-lg text-xs font-bold drop-shadow-[0_0_5px_rgba(251,191,36,0.5)]"><i class="fa-solid fa-triangle-exclamation mr-1"></i>เฝ้าระวัง</span>`;
+
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-slate-800/50 transition-colors">
+                            <td class="p-5 font-bold text-blue-400 font-mono text-base drop-shadow-[0_0_5px_rgba(59,130,246,0.5)]">${die.dieId}</td>
+                            <td class="p-5 text-center font-mono font-bold text-slate-200 text-base">${die.breakdownCount}</td>
+                            <td class="p-5 text-center text-rose-400 font-bold text-base drop-shadow-[0_0_5px_rgba(244,63,94,0.5)]">${die.totalRepairMinutes}</td>
+                            <td class="p-5 text-center font-mono text-base">${die.mttrEstimate}</td>
+                            <td class="p-5 text-center font-mono text-base">${die.mtbfEstimate}</td>
+                            <td class="p-5 text-right">${riskHtml}</td>
+                        </tr>
+                    `;
+                });
+            }
+        };
+
+        function exportToExcel() {
+            if (dieDataList.length === 0) { alert("ไม่มีข้อมูลแม่พิมพ์ให้ดาวน์โหลดครับ"); return; }
+            let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; 
+            csvContent += "รหัสแม่พิมพ์ (Die ID),จำนวนครั้งที่ซ่อม (Breakdowns),เวลาซ่อมสะสม (นาที),MTTR (นาที),Est. MTBF (นาที),การประเมินสถานะ\n";
+
+            dieDataList.forEach(die => {
+                let statusText = "ปกติแข็งแรงดี";
+                if (die.mtbfEstimate < 200) statusText = "วิกฤต (ต้อง Modify)";
+                else if (die.mtbfEstimate < 400) statusText = "เฝ้าระวัง";
+
+                let row = `${die.dieId},${die.breakdownCount},${die.totalRepairMinutes},${die.mttrEstimate},${die.mtbfEstimate},${statusText}`;
+                csvContent += row + "\n";
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            const dateStr = new Date().toISOString().split('T')[0];
+            link.setAttribute("download", `Die_Master_Report_${dateStr}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>

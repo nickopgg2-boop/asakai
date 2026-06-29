@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="th" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Queue - DMS 4.0</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script src="data_engine.js"></script>
+    <script>
+        tailwind.config = { 
+            darkMode: 'class', 
+            theme: { 
+                extend: { 
+                    fontFamily: { sans: ['Prompt', 'sans-serif'] },
+                    colors: { darkbg: '#0b1120', darkcard: '#151f32', darkborder: '#1e293b' }
+                } 
+            } 
+        };
+        
+        function checkAccess() {
+            const userRole = localStorage.getItem('user_role');
+            if (!userRole) { window.location.replace("page_login.html"); return; }
+        }
+        function handleLogout() {
+            if (confirm("คุณต้องการออกจากระบบใช่หรือไม่?")) { 
+                localStorage.removeItem('user_role');
+                window.location.replace("page_login.html"); 
+            }
+        }
+        function hideUnauthorizedMenus() {
+            const userRole = localStorage.getItem('user_role');
+            if (!userRole) return;
+            document.querySelectorAll('#main-nav a').forEach(link => {
+                const roles = link.getAttribute('data-roles');
+                if (roles && !roles.split(',').includes(userRole)) { link.style.display = 'none'; }
+            });
+            const currentPage = window.location.pathname.split("/").pop();
+            document.querySelectorAll('#main-nav a').forEach(link => {
+                if(link.getAttribute('href') === currentPage) {
+                    link.className = "bg-blue-600/20 text-blue-400 border border-blue-500/50 px-5 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all flex items-center shadow-[0_0_10px_rgba(59,130,246,0.3)]";
+                }
+            });
+        }
+        document.addEventListener('DOMContentLoaded', () => {
+            document.documentElement.classList.add('dark');
+            checkAccess(); hideUnauthorizedMenus();
+        });
+    </script>
+    <style>
+        body { background-color: #0b1120; color: #94a3b8; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .cyber-card { background-color: #151f32; border: 1px solid #1e293b; border-radius: 1rem; }
+        input[type="datetime-local"]::-webkit-calendar-picker-indicator { cursor: pointer; filter: invert(1); }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col font-prompt selection:bg-blue-500/30">
+
+    <header class="bg-darkbg border-b border-darkborder sticky top-0 z-40 py-3" id="main-nav-bar">
+        <div class="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-14">
+                <div class="flex items-center space-x-3 shrink-0">
+                    <div class="w-10 h-10 rounded-xl bg-blue-900/30 flex items-center justify-center text-blue-400 text-xl border border-blue-500/30 shadow-[0_0_10px_rgba(59,130,246,0.2)]">
+                        <i class="fa-solid fa-screwdriver-wrench"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-slate-200 tracking-wider leading-tight text-sm uppercase">DMS 4.0</h1>
+                        <p class="text-[10px] text-slate-500">Technician Job Queue</p>
+                    </div>
+                </div>
+                
+                <div id="main-nav" class="hidden xl:flex items-center space-x-1 border border-darkborder rounded-xl p-1.5 bg-[#0f172a] shadow-inner mx-4 overflow-x-auto scrollbar-hide">
+                    <a href="page_dashboard.html" data-roles="executive" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-chart-pie mr-2"></i> Dashboard</a>
+                    <a href="page_reliability_dashboard.html" data-roles="executive" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-gauge-high mr-2"></i> Reliability</a>
+                    <a href="page_calendar.html" data-roles="executive,technician" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-regular fa-calendar mr-2"></i> Calendar</a>
+                    <a href="page_request_form.html" data-roles="executive,production" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-plus-square mr-2"></i> Request</a>
+                    <a href="page_job_queue.html" data-roles="executive,technician" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-list-ul mr-2"></i> Queue</a>
+                    <a href="page_status_tracking.html" data-roles="executive,production,technician" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-columns mr-2"></i> Status Board</a>
+                    <a href="page_kpi_analytics.html" data-roles="executive" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-chart-line mr-2"></i> KPIs</a>
+                    <a href="page_die_master.html" data-roles="executive,technician" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-database mr-2"></i> Die Master</a>
+                </div>
+
+                <div class="flex items-center space-x-2 shrink-0">
+                    <button onclick="handleLogout()" class="flex items-center text-slate-400 bg-slate-800/50 border border-slate-700 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all hover:bg-slate-800"><i class="fa-solid fa-right-from-bracket"></i></button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 p-4 lg:p-8 space-y-6 overflow-y-auto max-w-[1800px] mx-auto w-full">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+                <h2 class="text-xl font-bold text-slate-200 flex items-center gap-2.5">
+                    <i class="fa-solid fa-list-ul text-blue-400"></i> ตารางคิวงานช่างซ่อมบำรุง
+                </h2>
+                <p class="text-sm text-slate-500 mt-1">กดรับงาน เริ่มทำการซ่อม และบันทึกเวลาที่ใช้ในการแก้ไขปัญหา</p>
+            </div>
+            <div class="flex gap-2 w-full sm:w-auto overflow-x-auto">
+                <button onclick="loadJobs()" class="px-5 py-2 text-sm font-bold rounded-xl text-blue-400 bg-blue-500/10 border border-blue-500/30 shadow-[0_0_10px_rgba(59,130,246,0.2)] hover:bg-blue-500/20 transition-colors whitespace-nowrap"><i class="fa-solid fa-rotate-right mr-1.5"></i>รีเฟรชข้อมูล</button>
+            </div>
+        </div>
+
+        <div class="cyber-card overflow-hidden">
+            <div class="overflow-x-auto text-sm">
+                <table class="w-full text-left border-collapse whitespace-nowrap">
+                    <thead>
+                        <tr class="bg-[#0f172a] text-slate-400 font-bold border-b border-darkborder uppercase tracking-wider text-xs">
+                            <th class="p-4">รหัสใบงาน / เวลาแจ้ง</th>
+                            <th class="p-4">ข้อมูลแม่พิมพ์ (Die Info)</th>
+                            <th class="p-4">อาการเสีย (Defect)</th>
+                            <th class="p-4 text-center">สถานะปัจจุบัน</th>
+                            <th class="p-4 text-right">จัดการงาน (Action)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="jobTableBody" class="divide-y divide-darkborder font-medium text-slate-300"></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <div id="repairModal" class="fixed inset-0 bg-[#020617]/80 backdrop-blur-sm hidden items-center justify-center z-50 transition-opacity p-4">
+        <div class="cyber-card p-6 sm:p-8 w-full max-w-xl shadow-[0_0_30px_rgba(59,130,246,0.15)] max-h-[90vh] overflow-y-auto scrollbar-hide">
+            <h3 class="font-bold text-xl mb-6 text-slate-200 flex items-center gap-2"><i class="fa-solid fa-check-double text-blue-400"></i> บันทึกรายงานผลซ่อมจริง</h3>
+            <input type="hidden" id="mJobId">
+            <div class="space-y-5 text-sm">
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="font-bold text-slate-400 uppercase text-xs">เวลาเริ่ม (Start) <span class="text-rose-500">*</span></label>
+                        <input type="datetime-local" id="mStart" required class="w-full p-3 rounded-xl bg-[#0f172a] border border-slate-700 mt-2 font-mono text-sm text-slate-200 focus:border-blue-500 outline-none">
+                        <button onclick="document.getElementById('mStart').value = getCurrentDatetimeLocal()" class="text-[10px] font-bold text-blue-400 mt-2 hover:underline"><i class="fa-solid fa-clock"></i> ดึงเวลาปัจจุบัน</button>
+                    </div>
+                    <div>
+                        <label class="font-bold text-slate-400 uppercase text-xs">เวลาจบ (End) <span class="text-rose-500">*</span></label>
+                        <input type="datetime-local" id="mEnd" required class="w-full p-3 rounded-xl bg-[#0f172a] border border-slate-700 mt-2 font-mono text-sm text-slate-200 focus:border-blue-500 outline-none">
+                        <button onclick="document.getElementById('mEnd').value = getCurrentDatetimeLocal()" class="text-[10px] font-bold text-rose-400 mt-2 hover:underline"><i class="fa-solid fa-clock"></i> ดึงเวลาปัจจุบัน</button>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="font-bold text-slate-400 uppercase text-xs">วิธีซ่อม (Repair Method) <span class="text-rose-500">*</span></label>
+                    <select id="mMethod" required class="w-full p-3 rounded-xl bg-[#0f172a] text-slate-200 border border-slate-700 mt-2 focus:border-blue-500 outline-none">
+                        <option value="" disabled selected>-- เลือก --</option>
+                        <option value="เปลี่ยนอะไหล่">เปลี่ยนอะไหล่</option>
+                        <option value="เจียรปรับแต่ง">เจียรปรับแต่ง</option>
+                        <option value="เชื่อมพอก">เชื่อมพอก</option>
+                        <option value="ทำความสะอาด/PM">ทำความสะอาด/PM</option>
+                        <option value="แก้ไขชั่วคราว">แก้ไขชั่วคราว (รอวางแผน)</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="font-bold text-slate-400 uppercase text-xs">สาเหตุรากเหง้า (Root Cause) <span class="text-rose-500">*</span></label>
+                    <textarea id="mCause" required rows="3" class="w-full p-3 rounded-xl bg-[#0f172a] text-slate-200 border border-slate-700 mt-2 focus:border-blue-500 outline-none resize-none"></textarea>
+                </div>
+                
+                <div class="flex justify-end gap-3 pt-6 border-t border-darkborder">
+                    <button onclick="document.getElementById('repairModal').style.display='none'" class="px-6 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-bold hover:bg-slate-700 transition-colors">ยกเลิก</button>
+                    <button onclick="submitRepair()" class="px-6 py-2.5 rounded-xl bg-blue-600/20 border border-blue-500/50 text-blue-400 font-bold shadow-[0_0_15px_rgba(59,130,246,0.3)] hover:bg-blue-600/30 transition-all flex items-center gap-2"><i class="fa-solid fa-cloud-arrow-up"></i> บันทึกปิดงาน</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function loadJobs() {
+            const tbody = document.getElementById('jobTableBody');
+            tbody.innerHTML = '';
+            const jobs = typeof getAllJobs === 'function' ? getAllJobs().filter(j => j.status !== 'closed' && j.status !== 'done') : [];
+            
+            if(jobs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-slate-500 font-bold">ไม่มีคิวงานค้างในระบบ 🎉</td></tr>';
+                return;
+            }
+
+            jobs.forEach(job => {
+                const isUrgent = job.priority === 'ด่วน';
+                const isWorking = job.status === 'in_progress';
+                
+                let deptColorText = job.dept === 'L-D' ? 'text-orange-400' : (job.dept === 'P-D' ? 'text-purple-400' : 'text-blue-400');
+                let deptColorBg = job.dept === 'L-D' ? 'bg-orange-500/10 border-orange-500/30' : (job.dept === 'P-D' ? 'bg-purple-500/10 border-purple-500/30' : 'bg-blue-500/10 border-blue-500/30');
+
+                let displayTime = 'ไม่ระบุ';
+                if (job.requestAt) {
+                    const reqDate = new Date(job.requestAt);
+                    if (!isNaN(reqDate.getTime())) displayTime = reqDate.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.';
+                }
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-800/50 transition-colors">
+                        <td class="p-4 font-mono font-bold text-slate-300">${job.jobId}<br><span class="text-[10px] text-slate-500 font-normal"><i class="fa-regular fa-clock mr-1"></i>${displayTime}</span></td>
+                        <td class="p-4"><div class="flex items-center gap-2"><span class="text-[9px] font-bold ${deptColorText} ${deptColorBg} px-2 py-0.5 rounded border">${job.dept}</span><span class="font-bold text-slate-200">${job.dieId}</span></div><div class="text-[11px] text-slate-500 mt-1">${job.partName}</div></td>
+                        <td class="p-4"><div class="text-sm truncate max-w-[200px] text-slate-300">${job.defect}</div><div class="mt-1"><span class="text-[10px] font-bold px-2 py-0.5 rounded-md border ${isUrgent ? 'text-rose-400 bg-rose-500/10 border-rose-500/30 drop-shadow-[0_0_5px_rgba(244,63,94,0.5)]' : 'text-slate-400 bg-slate-800 border-slate-700'}">${job.jobType} | ${job.priority}</span></div></td>
+                        <td class="p-4 text-center"><span class="text-[10px] font-bold px-3 py-1.5 rounded-lg border ${isWorking ? 'text-blue-400 bg-blue-500/10 border-blue-500/30 drop-shadow-[0_0_5px_rgba(59,130,246,0.5)] animate-pulse' : 'text-amber-400 bg-amber-500/10 border-amber-500/30'}">${isWorking ? '<i class="fa-solid fa-wrench mr-1"></i>กำลังซ่อม' : 'รอมอบหมาย'}</span></td>
+                        <td class="p-4 text-right">
+                            <div class="flex items-center justify-end gap-2">
+                                ${isWorking ? 
+                                    `<button onclick="openModal('${job.jobId}')" class="bg-blue-500/20 border border-blue-500/50 text-blue-400 hover:bg-blue-500/30 px-4 py-2 rounded-xl text-xs font-bold shadow-[0_0_10px_rgba(59,130,246,0.3)] transition-all">ปิดงาน</button>` : 
+                                    `<button onclick="acceptJob('${job.jobId}')" class="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 px-4 py-2 rounded-xl text-xs font-bold transition-all"><i class="fa-solid fa-play mr-1"></i>รับงาน</button>`}
+                                <button onclick="deleteJob('${job.jobId}')" class="bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 px-3 py-2 rounded-xl text-xs font-bold transition-all" title="ลบใบงาน"><i class="fa-solid fa-trash-can"></i></button>
+                            </div>
+                        </td>
+                    </tr>`;
+            });
+        }
+
+        function acceptJob(id) {
+            const job = getAllJobs().find(j => j.jobId === id);
+            job.status = 'in_progress';
+            saveJob(job);
+            loadJobs();
+        }
+
+        function deleteJob(id) {
+            if(confirm('⚠️ คำเตือน: คุณต้องการลบใบแจ้งซ่อมนี้ออกจากระบบใช่หรือไม่?')) {
+                let jobs = JSON.parse(localStorage.getItem('dms_jobs')) || [];
+                jobs = jobs.filter(j => j.jobId !== id);
+                localStorage.setItem('dms_jobs', JSON.stringify(jobs));
+                loadJobs();
+            }
+        }
+
+        function getCurrentDatetimeLocal() {
+            const now = new Date();
+            const offsetMs = now.getTimezoneOffset() * 60 * 1000;
+            return (new Date(now.getTime() - offsetMs)).toISOString().slice(0, 16);
+        }
+
+        function openModal(id) {
+            const job = getAllJobs().find(j => j.jobId === id);
+            document.getElementById('mJobId').value = id;
+            document.getElementById('mStart').value = job.startTime || '';
+            document.getElementById('mEnd').value = job.endTime || '';
+            document.getElementById('mMethod').value = job.repairMethod || '';
+            document.getElementById('mCause').value = job.rootCause || '';
+            document.getElementById('repairModal').style.display = 'flex';
+        }
+
+        function submitRepair() {
+            const id = document.getElementById('mJobId').value;
+            const start = document.getElementById('mStart').value;
+            const end = document.getElementById('mEnd').value;
+            const method = document.getElementById('mMethod').value;
+            const cause = document.getElementById('mCause').value;
+
+            if(!start || !end || !method || !cause) { alert('⛔ กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบทุกช่อง'); return; }
+            
+            const sTime = new Date(start).getTime();
+            const eTime = new Date(end).getTime();
+            if (isNaN(sTime) || isNaN(eTime)) { alert('⛔ กรุณาระบุวันที่และเวลาให้ถูกต้อง'); return; }
+
+            let dt = Math.floor((eTime - sTime) / 60000);
+            if (dt < 0) { alert('⛔ เวลาจบงานต้องมากกว่าเวลาเริ่มงานเสมอครับ'); return; }
+
+            const job = getAllJobs().find(j => j.jobId === id);
+            job.startTime = start;
+            job.endTime = end;
+            job.repairMethod = method;
+            job.rootCause = cause;
+            job.downtimeMinutes = dt;
+            job.status = 'closed';
+            job.closedAt = new Date().toISOString();
+            job.closedBy = localStorage.getItem('user_name') || 'Tech';
+
+            saveJob(job);
+            document.getElementById('repairModal').style.display = 'none';
+            alert('✅ ปิดงานสำเร็จ ข้อมูลบันทึกลงระบบ Engine แล้ว!');
+            loadJobs();
+        }
+
+        window.addEventListener('DOMContentLoaded', () => { setTimeout(loadJobs, 100); });
+    </script>
+</body>
+</html>
