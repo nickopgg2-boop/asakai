@@ -73,10 +73,10 @@
                 </div>
                 
                 <div id="main-nav" class="hidden xl:flex items-center space-x-1 border border-darkborder rounded-xl p-1.5 bg-[#0f172a] shadow-inner mx-4 overflow-x-auto scrollbar-hide">
-                    <a href="page_dashboard.html" data-roles="executive" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-chart-pie mr-2"></i> Dashboard</a>
+                    <a href="page_dashboard.html" data-roles="executive,technician,production" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-chart-pie mr-2"></i> Dashboard</a>
                     <a href="page_reliability_dashboard.html" data-roles="executive" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-gauge-high mr-2"></i> Reliability</a>
                     <a href="page_calendar.html" data-roles="executive,technician" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-regular fa-calendar mr-2"></i> Calendar</a>
-                    <a href="page_request_form.html" data-roles="executive,production" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-plus-square mr-2"></i> Request</a>
+                    <a href="page_request_form.html" data-roles="executive,technician,production" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-plus-square mr-2"></i> Request</a>
                     <a href="page_job_queue.html" data-roles="executive,technician" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-list-ul mr-2"></i> Queue</a>
                     <a href="page_status_tracking.html" data-roles="executive,production,technician" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-columns mr-2"></i> Status Board</a>
                     <a href="page_kpi_analytics.html" data-roles="executive" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-chart-line mr-2"></i> KPIs</a>
@@ -170,6 +170,7 @@
         }
 
         window.addEventListener('DOMContentLoaded', () => { setTimeout(renderCalendar, 100); });
+        window.addEventListener('dms_jobs_updated', () => { setTimeout(renderCalendar, 150); });
     </script>
     <script src="app_ui.js"></script>
 </body>

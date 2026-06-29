@@ -73,10 +73,10 @@
                 </div>
                 
                 <div id="main-nav" class="hidden xl:flex items-center space-x-1 border border-darkborder rounded-xl p-1.5 bg-[#0f172a] shadow-inner mx-4 overflow-x-auto scrollbar-hide">
-                    <a href="page_dashboard.html" data-roles="executive" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-chart-pie mr-2"></i> Dashboard</a>
+                    <a href="page_dashboard.html" data-roles="executive,technician,production" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-chart-pie mr-2"></i> Dashboard</a>
                     <a href="page_reliability_dashboard.html" data-roles="executive" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-gauge-high mr-2"></i> Reliability</a>
                     <a href="page_calendar.html" data-roles="executive,technician" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-regular fa-calendar mr-2"></i> Calendar</a>
-                    <a href="page_request_form.html" data-roles="executive,production" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-plus-square mr-2"></i> Request</a>
+                    <a href="page_request_form.html" data-roles="executive,technician,production" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-plus-square mr-2"></i> Request</a>
                     <a href="page_job_queue.html" data-roles="executive,technician" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-list-ul mr-2"></i> Queue</a>
                     <a href="page_status_tracking.html" data-roles="executive,production,technician" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-columns mr-2"></i> Status Board</a>
                     <a href="page_kpi_analytics.html" data-roles="executive" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-chart-line mr-2"></i> KPIs</a>
@@ -122,57 +122,66 @@
     <script>
         let dieDataList = [];
 
-        window.onload = () => {
-            const badActors = typeof getDieMasterData === 'function' ? getDieMasterData() : ((typeof fetchAndCalculateKPIs === 'function' ? fetchAndCalculateKPIs().topBadActors : []) || []);
-            dieDataList = badActors; 
-            const tbody = document.getElementById('dieTableBody');
-            
-            if(badActors.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-slate-500 font-bold">ไม่มีข้อมูลแม่พิมพ์ในระบบ (กรุณาเพิ่มใบแจ้งซ่อม)</td></tr>';
-            } else {
-                badActors.forEach(die => {
-                    let riskHtml = `<span class="text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 rounded-lg text-xs font-bold drop-shadow-[0_0_5px_rgba(52,211,153,0.5)]"><i class="fa-solid fa-shield-heart mr-1"></i>ปกติแข็งแรงดี</span>`;
-                    
-                    if (die.mtbfEstimate < 200) riskHtml = `<span class="text-rose-400 bg-rose-500/10 border border-rose-500/30 px-3 py-1.5 rounded-lg text-xs font-bold drop-shadow-[0_0_5px_rgba(244,63,94,0.5)]"><i class="fa-solid fa-circle-radiation mr-1"></i>วิกฤต (ต้อง Modify)</span>`;
-                    else if (die.mtbfEstimate < 400) riskHtml = `<span class="text-amber-400 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-lg text-xs font-bold drop-shadow-[0_0_5px_rgba(251,191,36,0.5)]"><i class="fa-solid fa-triangle-exclamation mr-1"></i>เฝ้าระวัง</span>`;
+        function escapeCsv(value) {
+            const text = String(value ?? '');
+            return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+        }
 
-                    tbody.innerHTML += `
-                        <tr class="hover:bg-slate-800/50 transition-colors">
-                            <td class="p-5 font-bold text-blue-400 font-mono text-base drop-shadow-[0_0_5px_rgba(59,130,246,0.5)]">${die.dieId}<div class="text-[10px] text-slate-500 font-sans font-medium mt-1">${die.partName || ''}${die.partNumber ? ' | ' + die.partNumber : ''}${die.model ? ' | ' + die.model : ''}</div></td>
-                            <td class="p-5 text-center font-mono font-bold text-slate-200 text-base">${die.breakdownCount}</td>
-                            <td class="p-5 text-center text-rose-400 font-bold text-base drop-shadow-[0_0_5px_rgba(244,63,94,0.5)]">${die.totalRepairMinutes}</td>
-                            <td class="p-5 text-center font-mono text-base">${die.mttrEstimate}</td>
-                            <td class="p-5 text-center font-mono text-base">${die.mtbfEstimate}</td>
-                            <td class="p-5 text-right">${riskHtml}</td>
-                        </tr>
-                    `;
-                });
+        function renderDieMaster() {
+            const badActors = typeof getDieMasterData === 'function' ? getDieMasterData() : ((typeof fetchAndCalculateKPIs === 'function' ? fetchAndCalculateKPIs().topBadActors : []) || []);
+            dieDataList = badActors;
+            const tbody = document.getElementById('dieTableBody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            if (badActors.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-slate-500 font-bold">ไม่มีข้อมูลแม่พิมพ์ในระบบ (กรุณาเพิ่มใบแจ้งซ่อม)</td></tr>';
+                return;
             }
-        };
+
+            badActors.forEach(die => {
+                let riskHtml = `<span class="text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 rounded-lg text-xs font-bold drop-shadow-[0_0_5px_rgba(52,211,153,0.5)]"><i class="fa-solid fa-shield-heart mr-1"></i>ปกติแข็งแรงดี</span>`;
+                if (die.mtbfEstimate < 200) riskHtml = `<span class="text-rose-400 bg-rose-500/10 border border-rose-500/30 px-3 py-1.5 rounded-lg text-xs font-bold drop-shadow-[0_0_5px_rgba(244,63,94,0.5)]"><i class="fa-solid fa-circle-radiation mr-1"></i>วิกฤต (ต้อง Modify)</span>`;
+                else if (die.mtbfEstimate < 400) riskHtml = `<span class="text-amber-400 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-lg text-xs font-bold drop-shadow-[0_0_5px_rgba(251,191,36,0.5)]"><i class="fa-solid fa-triangle-exclamation mr-1"></i>เฝ้าระวัง</span>`;
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-800/50 transition-colors">
+                        <td class="p-5 font-bold text-blue-400 font-mono text-base drop-shadow-[0_0_5px_rgba(59,130,246,0.5)]">${die.dieId}<div class="text-[10px] text-slate-500 font-sans font-medium mt-1">${die.partName || ''}${die.partNumber ? ' | ' + die.partNumber : ''}${die.model ? ' | ' + die.model : ''}</div></td>
+                        <td class="p-5 text-center font-mono font-bold text-slate-200 text-base">${die.breakdownCount}</td>
+                        <td class="p-5 text-center text-rose-400 font-bold text-base drop-shadow-[0_0_5px_rgba(244,63,94,0.5)]">${die.totalRepairMinutes}</td>
+                        <td class="p-5 text-center font-mono text-base">${die.mttrEstimate}</td>
+                        <td class="p-5 text-center font-mono text-base">${die.mtbfEstimate}</td>
+                        <td class="p-5 text-right">${riskHtml}</td>
+                    </tr>`;
+            });
+        }
 
         function exportToExcel() {
-            if (dieDataList.length === 0) { alert("ไม่มีข้อมูลแม่พิมพ์ให้ดาวน์โหลดครับ"); return; }
-            let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; 
-            csvContent += "รหัสแม่พิมพ์ (Die ID),จำนวนครั้งที่ซ่อม (Breakdowns),เวลาซ่อมสะสม (นาที),MTTR (นาที),Est. MTBF (นาที),การประเมินสถานะ\n";
+            if (dieDataList.length === 0) { alert('ไม่มีข้อมูลแม่พิมพ์ให้ดาวน์โหลดครับ'); return; }
+            let csvContent = 'data:text/csv;charset=utf-8,\uFEFF';
+            csvContent += 'รหัสแม่พิมพ์ (Die ID),Part Name,Part Number,Model,จำนวนครั้งที่ซ่อม (Breakdowns),เวลาซ่อมสะสม (นาที),MTTR (นาที),Est. MTBF (นาที),การประเมินสถานะ\n';
 
             dieDataList.forEach(die => {
-                let statusText = "ปกติแข็งแรงดี";
-                if (die.mtbfEstimate < 200) statusText = "วิกฤต (ต้อง Modify)";
-                else if (die.mtbfEstimate < 400) statusText = "เฝ้าระวัง";
+                let statusText = 'ปกติแข็งแรงดี';
+                if (die.mtbfEstimate < 200) statusText = 'วิกฤต (ต้อง Modify)';
+                else if (die.mtbfEstimate < 400) statusText = 'เฝ้าระวัง';
 
-                let row = `${die.dieId},${die.partName || ''},${die.partNumber || ''},${die.model || ''},${die.breakdownCount},${die.totalRepairMinutes},${die.mttrEstimate},${die.mtbfEstimate},${statusText}`;
-                csvContent += row + "\n";
+                const row = [die.dieId, die.partName || '', die.partNumber || '', die.model || '', die.breakdownCount, die.totalRepairMinutes, die.mttrEstimate, die.mtbfEstimate, statusText].map(escapeCsv).join(',');
+                csvContent += row + '\n';
             });
 
             const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
+            const link = document.createElement('a');
+            link.setAttribute('href', encodedUri);
             const dateStr = new Date().toISOString().split('T')[0];
-            link.setAttribute("download", `Die_Master_Report_${dateStr}.csv`);
+            link.setAttribute('download', `Die_Master_Report_${dateStr}.csv`);
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
         }
+
+        window.addEventListener('DOMContentLoaded', () => { setTimeout(renderDieMaster, 150); });
+        window.addEventListener('dms_jobs_updated', () => { setTimeout(renderDieMaster, 150); });
     </script>
     <script src="app_ui.js"></script>
 </body>

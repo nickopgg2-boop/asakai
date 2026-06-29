@@ -1,11 +1,14 @@
-// --- data_engine.js (DMS 4.0 KPI Engine - Date Stable / Monthly Dashboard / Real Form Data) ---
-// เก็บข้อมูลไว้ใน localStorage ชื่อ dms_jobs เพื่อให้เปิดใช้งานบน GitHub Pages ได้โดยไม่ต้องมี Backend
+// --- data_engine.js (DMS 4.0 KPI Engine - Bugfixed: Google Sheet, Timezone, Closed-date KPI) ---
+// ใช้ localStorage เป็น cache และ sync กับ Google Sheet ผ่าน Apps Script
 
 const DMS_STORAGE_KEY = 'dms_jobs';
 const DMS_SHEET_API_KEY = 'dms_sheet_api_url';
+const DMS_DEFAULT_SHEET_API_URL = 'https://script.google.com/macros/s/AKfycbyneqZah0eShidCeljYAdX5WVQlJSIVN52AtdWaAk7Hj-7_MbKMxhIoqMHKaSA9muXr0g/exec';
+// โรงงานใช้งานเวลาไทยเป็นหลัก; ใช้สำหรับแปลงค่า ISO UTC จาก Google Sheet เช่น 2026-06-28T17:00:00.000Z => 2026-06-29
+const DMS_TIMEZONE_OFFSET_MINUTES = 7 * 60;
 
 function getDmsSheetApiUrl() {
-    return (localStorage.getItem(DMS_SHEET_API_KEY) || '').trim();
+    return (localStorage.getItem(DMS_SHEET_API_KEY) || DMS_DEFAULT_SHEET_API_URL || '').trim();
 }
 
 function setDmsSheetApiUrl(url) {
@@ -18,8 +21,320 @@ function isDmsCloudEnabled() {
     return Boolean(getDmsSheetApiUrl());
 }
 
+function pad2(value) {
+    return String(value).padStart(2, '0');
+}
+
+function getLocalDateString(dateObj) {
+    if (!dateObj || isNaN(dateObj.getTime())) return null;
+    return `${dateObj.getFullYear()}-${pad2(dateObj.getMonth() + 1)}-${pad2(dateObj.getDate())}`;
+}
+
+function getLocalDateTimeString(dateObj) {
+    if (!dateObj || isNaN(dateObj.getTime())) return null;
+    return `${dateObj.getFullYear()}-${pad2(dateObj.getMonth() + 1)}-${pad2(dateObj.getDate())}T${pad2(dateObj.getHours())}:${pad2(dateObj.getMinutes())}:${pad2(dateObj.getSeconds())}`;
+}
+
+function hasExplicitTimezone(text) {
+    return /[zZ]$|[+-]\d{2}:?\d{2}$/.test(String(text || '').trim());
+}
+
+function getConfiguredTimezoneDate(dateObj) {
+    if (!dateObj || isNaN(dateObj.getTime())) return null;
+    return new Date(dateObj.getTime() + DMS_TIMEZONE_OFFSET_MINUTES * 60 * 1000);
+}
+
+function getConfiguredDateString(dateObj) {
+    const shifted = getConfiguredTimezoneDate(dateObj);
+    if (!shifted) return null;
+    return `${shifted.getUTCFullYear()}-${pad2(shifted.getUTCMonth() + 1)}-${pad2(shifted.getUTCDate())}`;
+}
+
+function getConfiguredDateTimeString(dateObj) {
+    const shifted = getConfiguredTimezoneDate(dateObj);
+    if (!shifted) return null;
+    return `${shifted.getUTCFullYear()}-${pad2(shifted.getUTCMonth() + 1)}-${pad2(shifted.getUTCDate())}T${pad2(shifted.getUTCHours())}:${pad2(shifted.getUTCMinutes())}:${pad2(shifted.getUTCSeconds())}`;
+}
+
+function getLocalISOString() {
+    return getLocalDateTimeString(new Date());
+}
+
+function getLocalDatetimeInputValue() {
+    return getLocalISOString().slice(0, 16);
+}
+
+function parseNumber(value, fallback = 0) {
+    if (value === null || value === undefined || value === '') return fallback;
+    if (typeof value === 'number') return Number.isFinite(value) ? value : fallback;
+    const clean = String(value).replace(/,/g, '').trim();
+    const num = Number(clean);
+    return Number.isFinite(num) ? num : fallback;
+}
+
+function parseBoolean(value, fallback = true) {
+    if (value === null || value === undefined || value === '') return fallback;
+    if (typeof value === 'boolean') return value;
+    const text = String(value).trim().toLowerCase();
+    if (['true', '1', 'yes', 'y'].includes(text)) return true;
+    if (['false', '0', 'no', 'n'].includes(text)) return false;
+    return fallback;
+}
+
+function parseDateTimeValue(value) {
+    if (!value) return null;
+    if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
+
+    const text = String(value).trim();
+    if (!text) return null;
+
+    // Date only: keep as local date, not UTC.
+    let match = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (match) {
+        return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 0, 0, 0);
+    }
+
+    // Local datetime from form or Sheet: yyyy-mm-dd HH:mm[:ss] or yyyy-mm-ddTHH:mm[:ss] with no timezone.
+    match = text.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?$/);
+    if (match) {
+        return new Date(
+            Number(match[1]),
+            Number(match[2]) - 1,
+            Number(match[3]),
+            Number(match[4]),
+            Number(match[5]),
+            Number(match[6] || 0)
+        );
+    }
+
+    // ISO with timezone/Z. Browser converts to user's local timezone.
+    const parsed = new Date(text);
+    return isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function toLocalDateOnly(value) {
+    if (!value) return null;
+    if (value instanceof Date) return getLocalDateString(value);
+
+    const text = String(value).trim();
+    if (!text) return null;
+
+    // Only a date. Do not pass through Date() because yyyy-mm-dd is treated as UTC by JS.
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+
+    const d = parseDateTimeValue(text);
+    if (!d) return null;
+    return hasExplicitTimezone(text) ? getConfiguredDateString(d) : getLocalDateString(d);
+}
+
+function toLocalDateTimeOnly(value) {
+    if (!value) return null;
+    if (value instanceof Date) return getLocalDateTimeString(value);
+    const text = String(value).trim();
+    const d = parseDateTimeValue(text);
+    if (!d) return null;
+    return hasExplicitTimezone(text) ? getConfiguredDateTimeString(d) : getLocalDateTimeString(d);
+}
+
+// Backward-compatible alias used by old pages.
+function extractDateString(value) {
+    return toLocalDateOnly(value);
+}
+
+function parseLocalDate(dateStr) {
+    const clean = toLocalDateOnly(dateStr);
+    if (!clean) return null;
+    const [year, month, day] = clean.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    if (isNaN(date.getTime())) return null;
+    date.setHours(0, 0, 0, 0);
+    return date;
+}
+
+function addDays(dateObj, days) {
+    const d = new Date(dateObj);
+    d.setDate(d.getDate() + days);
+    return d;
+}
+
+function getCurrentMonthBounds(referenceDate = new Date()) {
+    const start = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1);
+    const end = new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 0);
+    return {
+        startDate: getLocalDateString(start),
+        endDate: getLocalDateString(end)
+    };
+}
+
+function getDateRangeList(startDate, endDate) {
+    const start = parseLocalDate(startDate);
+    const end = parseLocalDate(endDate);
+    if (!start || !end || start > end) return [];
+
+    const result = [];
+    let cursor = new Date(start);
+    while (cursor <= end) {
+        result.push(getLocalDateString(cursor));
+        cursor = addDays(cursor, 1);
+    }
+    return result;
+}
+
+function isDateInRange(dateStr, startDate, endDate) {
+    const checkDate = parseLocalDate(dateStr);
+    if (!checkDate) return false;
+
+    const start = parseLocalDate(startDate);
+    const end = parseLocalDate(endDate);
+
+    if (start && checkDate < start) return false;
+    if (end && checkDate > end) return false;
+    return true;
+}
+
+function getJobReportDate(job = {}) {
+    const status = String(job.status || '').toLowerCase();
+    if (status === 'closed' || status === 'done') {
+        return toLocalDateOnly(job.closedAt)
+            || toLocalDateOnly(job.endTime)
+            || toLocalDateOnly(job.plannedDate)
+            || toLocalDateOnly(job.requestAt)
+            || getLocalDateString(new Date());
+    }
+    return toLocalDateOnly(job.plannedDate)
+        || toLocalDateOnly(job.requestAt)
+        || toLocalDateOnly(job.closedAt)
+        || getLocalDateString(new Date());
+}
+
+// Public function used by pages/KPI. Closed jobs are reported by closedAt/endTime first.
+function getJobDate(job) {
+    return getJobReportDate(job);
+}
+
+function minutesBetween(startValue, endValue) {
+    const start = parseDateTimeValue(startValue);
+    const end = parseDateTimeValue(endValue);
+    if (!start || !end) return null;
+    const diff = Math.round((end.getTime() - start.getTime()) / 60000);
+    return diff >= 0 ? diff : null;
+}
+
+function calculateJobDowntimeMinutes(job) {
+    if (!job) return null;
+
+    let diff = minutesBetween(job.startTime, job.endTime || job.closedAt);
+
+    // If the card was closed directly from Kanban, old data may have startTime=endTime.
+    // Use requestAt as a fallback so the Dashboard does not show a false 0-minute BM.
+    if ((diff === null || diff === 0) && job.requestAt && (job.endTime || job.closedAt)) {
+        const fallbackDiff = minutesBetween(job.requestAt, job.endTime || job.closedAt);
+        if (fallbackDiff !== null && fallbackDiff > diff) diff = fallbackDiff;
+    }
+
+    return diff;
+}
+
+function normalizeJob(job = {}) {
+    const requestAt = toLocalDateTimeOnly(job.requestAt || job.time) || getLocalISOString();
+    const closedAt = toLocalDateTimeOnly(job.closedAt) || null;
+    const endTime = toLocalDateTimeOnly(job.endTime) || null;
+    const startTime = toLocalDateTimeOnly(job.startTime) || null;
+    const plannedDate = toLocalDateOnly(job.plannedDate)
+        || toLocalDateOnly(requestAt)
+        || toLocalDateOnly(closedAt)
+        || getLocalDateString(new Date());
+
+    const rawStatus = String(job.status || 'pending').trim().toLowerCase();
+    const status = rawStatus === 'done' ? 'closed' : rawStatus;
+    const jobType = String(job.jobType || (job.dept === 'PM' ? 'PM' : 'BM')).toUpperCase();
+
+    const normalized = {
+        jobId: String(job.jobId || job.id || `REQ-${Date.now()}`),
+        requestAt,
+        plannedDate,
+        sap: job.sap || job.sapRef || '',
+        dept: String(job.dept || 'UNKNOWN-DEPT').toUpperCase(),
+        dieId: String(job.dieId || job.assetId || 'UNKNOWN-DIE').toUpperCase(),
+        partName: job.partName || job.part || job.part_name || 'ไม่ระบุชื่อ Part',
+        partNumber: String(job.partNumber || job.partNo || job.part_number || '').toUpperCase(),
+        model: String(job.model || job.modelName || '').toUpperCase(),
+        defect: job.defect || job.problemDesc || job.problem || '',
+        partStock: job.partStock || '',
+        priority: job.priority || 'ปกติ',
+        status,
+        assignedTech: job.assignedTech || null,
+        startTime,
+        endTime,
+        repairMethod: job.repairMethod || job.repairCategory || null,
+        rootCause: job.rootCause || job.repairDetail || null,
+        downtimeMinutes: parseNumber(job.downtimeMinutes, null),
+        jobType,
+        closedBy: job.closedBy || null,
+        closedAt,
+        isScheduledForProduction: parseBoolean(job.isScheduledForProduction, true),
+        shiftPlannedMinutes: parseNumber(job.shiftPlannedMinutes, 480),
+        updatedAt: toLocalDateTimeOnly(job.updatedAt) || job.updatedAt || null
+    };
+
+    if (normalized.status !== 'closed') {
+        normalized.endTime = null;
+        normalized.closedAt = null;
+        normalized.closedBy = null;
+        normalized.downtimeMinutes = null;
+    }
+
+    if (normalized.status === 'closed') {
+        const calculated = calculateJobDowntimeMinutes(normalized);
+        if (normalized.downtimeMinutes === null || normalized.downtimeMinutes <= 0) {
+            normalized.downtimeMinutes = calculated !== null ? calculated : 0;
+        }
+        normalized.endTime = normalized.endTime || normalized.closedAt || null;
+        normalized.closedAt = normalized.closedAt || normalized.endTime || null;
+    }
+
+    if (!Number.isFinite(normalized.shiftPlannedMinutes) || normalized.shiftPlannedMinutes <= 0) {
+        normalized.shiftPlannedMinutes = 480;
+    }
+
+    return normalized;
+}
+
+function compareJobFreshness(a, b) {
+    const aTime = parseDateTimeValue(a.updatedAt || a.closedAt || a.endTime || a.requestAt);
+    const bTime = parseDateTimeValue(b.updatedAt || b.closedAt || b.endTime || b.requestAt);
+    const av = aTime ? aTime.getTime() : 0;
+    const bv = bTime ? bTime.getTime() : 0;
+    return av - bv;
+}
+
+function mergeJobArrays(...arrays) {
+    const merged = new Map();
+    arrays.flat().filter(Boolean).map(normalizeJob).forEach(job => {
+        const existing = merged.get(job.jobId);
+        if (!existing || compareJobFreshness(existing, job) <= 0) merged.set(job.jobId, job);
+    });
+    return [...merged.values()];
+}
+
+function getAllJobs() {
+    try {
+        const jobs = JSON.parse(localStorage.getItem(DMS_STORAGE_KEY));
+        if (!Array.isArray(jobs)) return [];
+        return jobs.map(normalizeJob).sort((a, b) => {
+            const da = `${getJobDate(a)} ${a.requestAt || ''}`;
+            const db = `${getJobDate(b)} ${b.requestAt || ''}`;
+            return db.localeCompare(da);
+        });
+    } catch (error) {
+        console.warn('DMS: cannot read jobs from localStorage', error);
+        return [];
+    }
+}
+
 function saveJobsToLocal(jobs) {
-    localStorage.setItem(DMS_STORAGE_KEY, JSON.stringify((jobs || []).map(normalizeJob)));
+    const normalized = (jobs || []).map(normalizeJob);
+    localStorage.setItem(DMS_STORAGE_KEY, JSON.stringify(normalized));
     window.dispatchEvent(new Event('dms_jobs_updated'));
 }
 
@@ -73,16 +388,14 @@ function pullJobsFromSheet() {
             if (response && response.ok && Array.isArray(response.jobs)) {
                 const cloudJobs = response.jobs.map(normalizeJob);
                 const localJobs = getAllJobs();
-                const merged = new Map();
-
-                localJobs.forEach(j => merged.set(j.jobId, j));
-                cloudJobs.forEach(j => merged.set(j.jobId, j));
-
-                saveJobsToLocal([...merged.values()]);
+                saveJobsToLocal(mergeJobArrays(localJobs, cloudJobs));
                 if (typeof showToast === 'function') showToast('โหลดข้อมูลจาก Google Sheet แล้ว', 'success');
+            } else if (typeof showToast === 'function') {
+                showToast('รูปแบบข้อมูลจาก Google Sheet ไม่ถูกต้อง', 'error');
             }
         } catch (err) {
             console.warn('DMS cloud pull parse failed:', err);
+            if (typeof showToast === 'function') showToast('อ่านข้อมูลจาก Google Sheet ไม่สำเร็จ', 'error');
         } finally {
             delete window[callbackName];
             const tag = document.getElementById(callbackName);
@@ -93,179 +406,13 @@ function pullJobsFromSheet() {
     const sep = apiUrl.includes('?') ? '&' : '?';
     const script = document.createElement('script');
     script.id = callbackName;
-    script.src = `${apiUrl}${sep}action=list&callback=${callbackName}`;
+    script.src = `${apiUrl}${sep}action=list&callback=${callbackName}&_=${Date.now()}`;
     script.onerror = () => {
         if (typeof showToast === 'function') showToast('โหลดข้อมูลจาก Google Sheet ไม่สำเร็จ', 'error');
         delete window[callbackName];
         script.remove();
     };
     document.body.appendChild(script);
-}
-
-window.addEventListener('DOMContentLoaded', () => {
-    if (isDmsCloudEnabled()) {
-        setTimeout(() => pullJobsFromSheet(), 300);
-    }
-});
-
-function pad2(value) {
-    return String(value).padStart(2, '0');
-}
-
-function getLocalDateString(dateObj) {
-    if (!dateObj || isNaN(dateObj.getTime())) return null;
-    return `${dateObj.getFullYear()}-${pad2(dateObj.getMonth() + 1)}-${pad2(dateObj.getDate())}`;
-}
-
-function getLocalISOString() {
-    const now = new Date();
-    const offsetMs = now.getTimezoneOffset() * 60 * 1000;
-    return new Date(now.getTime() - offsetMs).toISOString().slice(0, 19);
-}
-
-function getLocalDatetimeInputValue() {
-    return getLocalISOString().slice(0, 16);
-}
-
-function extractDateString(value) {
-    if (!value) return null;
-    if (value instanceof Date) return getLocalDateString(value);
-    const text = String(value).trim();
-    const match = text.match(/^(\d{4}-\d{2}-\d{2})/);
-    return match ? match[1] : null;
-}
-
-function parseLocalDate(dateStr) {
-    const clean = extractDateString(dateStr);
-    if (!clean) return null;
-    const [year, month, day] = clean.split('-').map(Number);
-    if (!year || !month || !day) return null;
-    const date = new Date(year, month - 1, day);
-    if (isNaN(date.getTime())) return null;
-    date.setHours(0, 0, 0, 0);
-    return date;
-}
-
-function addDays(dateObj, days) {
-    const d = new Date(dateObj);
-    d.setDate(d.getDate() + days);
-    return d;
-}
-
-function getCurrentMonthBounds(referenceDate = new Date()) {
-    const start = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1);
-    const end = new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 0);
-    return {
-        startDate: getLocalDateString(start),
-        endDate: getLocalDateString(end)
-    };
-}
-
-function getDateRangeList(startDate, endDate) {
-    const start = parseLocalDate(startDate);
-    const end = parseLocalDate(endDate);
-    if (!start || !end || start > end) return [];
-
-    const result = [];
-    let cursor = new Date(start);
-    while (cursor <= end) {
-        result.push(getLocalDateString(cursor));
-        cursor = addDays(cursor, 1);
-    }
-    return result;
-}
-
-function isDateInRange(dateStr, startDate, endDate) {
-    const checkDate = parseLocalDate(dateStr);
-    if (!checkDate) return false;
-
-    const start = parseLocalDate(startDate);
-    const end = parseLocalDate(endDate);
-
-    if (start && checkDate < start) return false;
-    if (end && checkDate > end) return false;
-    return true;
-}
-
-function getJobDate(job) {
-    return job.plannedDate || extractDateString(job.requestAt) || extractDateString(job.closedAt) || getLocalDateString(new Date());
-}
-
-function calculateJobDowntimeMinutes(job) {
-    if (!job || !job.startTime || !job.endTime) return null;
-
-    const start = new Date(job.startTime).getTime();
-    const end = new Date(job.endTime).getTime();
-    if (!isNaN(start) && !isNaN(end)) {
-        const diff = Math.round((end - start) / 60000);
-        return diff >= 0 ? diff : null;
-    }
-
-    const startText = String(job.startTime).replace('น.', '').trim();
-    const endText = String(job.endTime).replace('น.', '').trim();
-    const timePattern = /^\d{1,2}:\d{2}$/;
-    if (timePattern.test(startText) && timePattern.test(endText)) {
-        const [sh, sm] = startText.split(':').map(Number);
-        const [eh, em] = endText.split(':').map(Number);
-        let diff = (eh * 60 + em) - (sh * 60 + sm);
-        if (diff < 0) diff += 24 * 60;
-        return diff;
-    }
-
-    return null;
-}
-
-function normalizeJob(job = {}) {
-    const requestAt = job.requestAt || job.time || getLocalISOString();
-    const plannedDate = job.plannedDate || extractDateString(requestAt) || extractDateString(job.closedAt) || getLocalDateString(new Date());
-    const status = job.status === 'done' ? 'closed' : (job.status || 'pending');
-    const normalized = {
-        jobId: job.jobId || job.id || `REQ-${Date.now()}`,
-        requestAt,
-        plannedDate,
-        sap: job.sap || job.sapRef || '',
-        dept: job.dept || 'UNKNOWN-DEPT',
-        dieId: String(job.dieId || job.assetId || 'UNKNOWN-DIE').toUpperCase(),
-        partName: job.partName || job.part || job.part_name || 'ไม่ระบุชื่อ Part',
-        partNumber: job.partNumber || job.partNo || job.part_number || '',
-        model: job.model || job.modelName || '',
-        defect: job.defect || job.problemDesc || job.problem || '',
-        partStock: job.partStock || '',
-        priority: job.priority || 'ปกติ',
-        status,
-        assignedTech: job.assignedTech || null,
-        startTime: job.startTime || null,
-        endTime: job.endTime || null,
-        repairMethod: job.repairMethod || job.repairCategory || null,
-        rootCause: job.rootCause || job.repairDetail || null,
-        downtimeMinutes: typeof job.downtimeMinutes === 'number' ? job.downtimeMinutes : null,
-        jobType: job.jobType || (job.dept === 'PM' ? 'PM' : 'BM'),
-        closedBy: job.closedBy || null,
-        closedAt: job.closedAt || null,
-        isScheduledForProduction: job.isScheduledForProduction !== undefined ? job.isScheduledForProduction : true,
-        shiftPlannedMinutes: Number(job.shiftPlannedMinutes || 480)
-    };
-
-    if (normalized.downtimeMinutes === null) {
-        normalized.downtimeMinutes = calculateJobDowntimeMinutes(normalized);
-    }
-
-    return normalized;
-}
-
-function getAllJobs() {
-    try {
-        const jobs = JSON.parse(localStorage.getItem(DMS_STORAGE_KEY));
-        if (!Array.isArray(jobs)) return [];
-        return jobs.map(normalizeJob).sort((a, b) => {
-            const da = `${getJobDate(a)} ${a.requestAt || ''}`;
-            const db = `${getJobDate(b)} ${b.requestAt || ''}`;
-            return db.localeCompare(da);
-        });
-    } catch (error) {
-        console.warn('DMS: cannot read jobs from localStorage', error);
-        return [];
-    }
 }
 
 function saveJob(jobObj) {
@@ -276,7 +423,7 @@ function saveJob(jobObj) {
     if (index !== -1) jobs[index] = normJob;
     else jobs.push(normJob);
 
-    localStorage.setItem(DMS_STORAGE_KEY, JSON.stringify(jobs));
+    localStorage.setItem(DMS_STORAGE_KEY, JSON.stringify(jobs.map(normalizeJob)));
     window.dispatchEvent(new Event('dms_jobs_updated'));
     syncJobToSheet(normJob);
 }
@@ -290,8 +437,8 @@ function deleteJobById(jobId) {
 
 function getTrendDates(startDate, endDate) {
     if (startDate && endDate) return getDateRangeList(startDate, endDate);
-    if (startDate && !endDate) return [extractDateString(startDate)];
-    if (!startDate && endDate) return [extractDateString(endDate)];
+    if (startDate && !endDate) return [toLocalDateOnly(startDate)].filter(Boolean);
+    if (!startDate && endDate) return [toLocalDateOnly(endDate)].filter(Boolean);
 
     const month = getCurrentMonthBounds();
     return getDateRangeList(month.startDate, month.endDate);
@@ -299,8 +446,15 @@ function getTrendDates(startDate, endDate) {
 
 function getAnalysisDays(filteredJobs, startDate, endDate) {
     if (startDate && endDate) return Math.max(getDateRangeList(startDate, endDate).length, 1);
-    const uniqueDates = new Set(filteredJobs.map(getJobDate));
+    const uniqueDates = new Set(filteredJobs.map(getJobDate).filter(Boolean));
     return Math.max(uniqueDates.size, 1);
+}
+
+function getShiftMinutesForDay(dayJobs) {
+    const activeDies = new Set(dayJobs.filter(j => j.isScheduledForProduction).map(j => j.dieId));
+    const activeCount = Math.max(activeDies.size, 1);
+    const shift = dayJobs.reduce((max, job) => Math.max(max, parseNumber(job.shiftPlannedMinutes, 480)), 480);
+    return activeCount * shift;
 }
 
 function fetchAndCalculateKPIs(startDate = null, endDate = null) {
@@ -312,17 +466,16 @@ function fetchAndCalculateKPIs(startDate = null, endDate = null) {
     const breakdowns = closedJobs.filter(j => j.jobType === 'BM');
     const pmClosed = closedJobs.filter(j => j.jobType === 'PM');
 
-    const totalRepairMinutes = breakdowns.reduce((sum, job) => sum + (Number(job.downtimeMinutes) || 0), 0);
+    const totalRepairMinutes = breakdowns.reduce((sum, job) => sum + parseNumber(job.downtimeMinutes, 0), 0);
     const avgMTTR = breakdowns.length > 0 ? Math.round(totalRepairMinutes / breakdowns.length) : 0;
 
-    const uniqueDates = [...new Set(breakdowns.map(getJobDate))];
+    const uniqueDates = [...new Set(breakdowns.map(getJobDate).filter(Boolean))];
     let sumDailyMTBF = 0;
     uniqueDates.forEach(dateStr => {
         const dayBreakdowns = breakdowns.filter(j => getJobDate(j) === dateStr);
-        const dailyRepairMinutes = dayBreakdowns.reduce((sum, job) => sum + (Number(job.downtimeMinutes) || 0), 0);
-        const activeDies = new Set(filteredJobs.filter(j => getJobDate(j) === dateStr && j.isScheduledForProduction).map(j => j.dieId));
-        const activeCount = Math.max(activeDies.size, 1);
-        const runningMinutes = Math.max((480 * activeCount) - dailyRepairMinutes, 0);
+        const dayJobs = filteredJobs.filter(j => getJobDate(j) === dateStr);
+        const dailyRepairMinutes = dayBreakdowns.reduce((sum, job) => sum + parseNumber(job.downtimeMinutes, 0), 0);
+        const runningMinutes = Math.max(getShiftMinutesForDay(dayJobs) - dailyRepairMinutes, 0);
         sumDailyMTBF += dayBreakdowns.length > 0 ? Math.round(runningMinutes / dayBreakdowns.length) : 0;
     });
     const avgMTBF = uniqueDates.length > 0 ? Math.round(sumDailyMTBF / uniqueDates.length) : 0;
@@ -332,7 +485,7 @@ function fetchAndCalculateKPIs(startDate = null, endDate = null) {
     depts.forEach(dept => {
         const deptJobs = filteredJobs.filter(j => j.dept === dept);
         const deptBreakdowns = breakdowns.filter(j => j.dept === dept);
-        const deptRepairMinutes = deptBreakdowns.reduce((sum, job) => sum + (Number(job.downtimeMinutes) || 0), 0);
+        const deptRepairMinutes = deptBreakdowns.reduce((sum, job) => sum + parseNumber(job.downtimeMinutes, 0), 0);
         byDept[dept] = {
             totalJobs: deptJobs.length,
             breakdowns: deptBreakdowns.length,
@@ -355,7 +508,7 @@ function fetchAndCalculateKPIs(startDate = null, endDate = null) {
             };
         }
         dieStats[job.dieId].breakdownCount += 1;
-        dieStats[job.dieId].totalRepairMinutes += Number(job.downtimeMinutes) || 0;
+        dieStats[job.dieId].totalRepairMinutes += parseNumber(job.downtimeMinutes, 0);
     });
 
     const topBadActors = Object.values(dieStats).map(item => {
@@ -375,11 +528,9 @@ function fetchAndCalculateKPIs(startDate = null, endDate = null) {
         const dayJobs = allJobs.filter(j => getJobDate(j) === dateStr);
         const dayBreakdowns = dayJobs.filter(j => j.jobType === 'BM' && j.status === 'closed');
         const dayPMs = dayJobs.filter(j => j.jobType === 'PM' && j.status === 'closed');
-        const dayRepairMinutes = dayBreakdowns.reduce((sum, job) => sum + (Number(job.downtimeMinutes) || 0), 0);
+        const dayRepairMinutes = dayBreakdowns.reduce((sum, job) => sum + parseNumber(job.downtimeMinutes, 0), 0);
         const dayMTTR = dayBreakdowns.length > 0 ? Math.round(dayRepairMinutes / dayBreakdowns.length) : 0;
-        const activeDies = new Set(dayJobs.filter(j => j.isScheduledForProduction).map(j => j.dieId));
-        const activeCount = Math.max(activeDies.size, 1);
-        const dayRunningMinutes = Math.max((480 * activeCount) - dayRepairMinutes, 0);
+        const dayRunningMinutes = Math.max(getShiftMinutesForDay(dayJobs) - dayRepairMinutes, 0);
         const dayMTBF = dayBreakdowns.length > 0 ? Math.round(dayRunningMinutes / dayBreakdowns.length) : 0;
 
         trend.dates.push(dateStr);
@@ -433,7 +584,7 @@ function getDieMasterData(startDate = null, endDate = null) {
             };
         }
         dieStats[job.dieId].breakdownCount += 1;
-        dieStats[job.dieId].totalRepairMinutes += Number(job.downtimeMinutes) || 0;
+        dieStats[job.dieId].totalRepairMinutes += parseNumber(job.downtimeMinutes, 0);
     });
 
     return Object.values(dieStats).map(item => {
@@ -445,3 +596,9 @@ function getDieMasterData(startDate = null, endDate = null) {
         return b.breakdownCount - a.breakdownCount;
     });
 }
+
+window.addEventListener('DOMContentLoaded', () => {
+    if (isDmsCloudEnabled()) {
+        setTimeout(() => pullJobsFromSheet(), 300);
+    }
+});

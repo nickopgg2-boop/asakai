@@ -74,10 +74,10 @@
                 </div>
                 
                 <div id="main-nav" class="hidden xl:flex items-center space-x-1 border border-darkborder rounded-xl p-1.5 bg-[#0f172a] shadow-inner mx-4 overflow-x-auto scrollbar-hide">
-                    <a href="page_dashboard.html" data-roles="executive" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-chart-pie mr-2"></i> Dashboard</a>
+                    <a href="page_dashboard.html" data-roles="executive,technician,production" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-chart-pie mr-2"></i> Dashboard</a>
                     <a href="page_reliability_dashboard.html" data-roles="executive" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-gauge-high mr-2"></i> Reliability</a>
                     <a href="page_calendar.html" data-roles="executive,technician" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-regular fa-calendar mr-2"></i> Calendar</a>
-                    <a href="page_request_form.html" data-roles="executive,production" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-plus-square mr-2"></i> Request</a>
+                    <a href="page_request_form.html" data-roles="executive,technician,production" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-plus-square mr-2"></i> Request</a>
                     <a href="page_job_queue.html" data-roles="executive,technician" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-list-ul mr-2"></i> Queue</a>
                     <a href="page_status_tracking.html" data-roles="executive,production,technician" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-columns mr-2"></i> Status Board</a>
                     <a href="page_kpi_analytics.html" data-roles="executive" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-chart-line mr-2"></i> KPIs</a>
@@ -167,6 +167,10 @@
     </div>
 
     <script>
+        const queueUserRole = localStorage.getItem('user_role');
+        const canEditQueue = queueUserRole === 'executive' || queueUserRole === 'technician';
+        const canDeleteQueue = queueUserRole === 'executive';
+
         function loadJobs() {
             const tbody = document.getElementById('jobTableBody');
             tbody.innerHTML = '';
@@ -198,10 +202,11 @@
                         <td class="p-4 text-center"><span class="text-[10px] font-bold px-3 py-1.5 rounded-lg border ${isWorking ? 'text-blue-400 bg-blue-500/10 border-blue-500/30 drop-shadow-[0_0_5px_rgba(59,130,246,0.5)] animate-pulse' : 'text-amber-400 bg-amber-500/10 border-amber-500/30'}">${isWorking ? '<i class="fa-solid fa-wrench mr-1"></i>กำลังซ่อม' : 'รอมอบหมาย'}</span></td>
                         <td class="p-4 text-right">
                             <div class="flex items-center justify-end gap-2">
-                                ${isWorking ? 
+                                ${canEditQueue ? (isWorking ? 
                                     `<button onclick="openModal('${job.jobId}')" class="bg-blue-500/20 border border-blue-500/50 text-blue-400 hover:bg-blue-500/30 px-4 py-2 rounded-xl text-xs font-bold shadow-[0_0_10px_rgba(59,130,246,0.3)] transition-all">ปิดงาน</button>` : 
-                                    `<button onclick="acceptJob('${job.jobId}')" class="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 px-4 py-2 rounded-xl text-xs font-bold transition-all"><i class="fa-solid fa-play mr-1"></i>รับงาน</button>`}
-                                <button onclick="deleteJob('${job.jobId}')" class="bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 px-3 py-2 rounded-xl text-xs font-bold transition-all" title="ลบใบงาน"><i class="fa-solid fa-trash-can"></i></button>
+                                    `<button onclick="acceptJob('${job.jobId}')" class="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 px-4 py-2 rounded-xl text-xs font-bold transition-all"><i class="fa-solid fa-play mr-1"></i>รับงาน</button>`) :
+                                    `<span class="text-[10px] font-bold text-amber-300 bg-amber-500/10 border border-amber-500/30 px-3 py-2 rounded-xl"><i class="fa-solid fa-eye mr-1"></i>ดูอย่างเดียว</span>`}
+                                ${canDeleteQueue ? `<button onclick="deleteJob('${job.jobId}')" class="bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 px-3 py-2 rounded-xl text-xs font-bold transition-all" title="ลบใบงาน"><i class="fa-solid fa-trash-can"></i></button>` : ''}
                             </div>
                         </td>
                     </tr>`;
@@ -209,6 +214,7 @@
         }
 
         function acceptJob(id) {
+            if (!canEditQueue) { if (typeof showToast === 'function') showToast('บัญชีนี้ดูคิวงานได้อย่างเดียว', 'warning'); return; }
             const job = getAllJobs().find(j => j.jobId === id);
             if (!job) return;
             job.status = 'in_progress';
@@ -219,6 +225,7 @@
         }
 
         function deleteJob(id) {
+            if (!canDeleteQueue) { if (typeof showToast === 'function') showToast('ลบใบงานได้เฉพาะหัวหน้างาน/ผู้จัดการ', 'warning'); return; }
             if(confirm('⚠️ คำเตือน: คุณต้องการลบใบแจ้งซ่อมนี้ออกจากระบบใช่หรือไม่?')) {
                 if (typeof deleteJobById === 'function') deleteJobById(id);
                 else {
@@ -238,16 +245,18 @@
         }
 
         function openModal(id) {
+            if (!canEditQueue) { if (typeof showToast === 'function') showToast('บัญชีนี้ดูคิวงานได้อย่างเดียว', 'warning'); return; }
             const job = getAllJobs().find(j => j.jobId === id);
             document.getElementById('mJobId').value = id;
-            document.getElementById('mStart').value = job.startTime || '';
-            document.getElementById('mEnd').value = job.endTime || '';
+            document.getElementById('mStart').value = (job.startTime || '').slice(0, 16);
+            document.getElementById('mEnd').value = (job.endTime || '').slice(0, 16);
             document.getElementById('mMethod').value = job.repairMethod || '';
             document.getElementById('mCause').value = job.rootCause || '';
             document.getElementById('repairModal').style.display = 'flex';
         }
 
         function submitRepair() {
+            if (!canEditQueue) { if (typeof showToast === 'function') showToast('บัญชีนี้ดูคิวงานได้อย่างเดียว', 'warning'); return; }
             const id = document.getElementById('mJobId').value;
             const start = document.getElementById('mStart').value;
             const end = document.getElementById('mEnd').value;
@@ -275,7 +284,7 @@
             job.rootCause = cause;
             job.downtimeMinutes = dt;
             job.status = 'closed';
-            job.closedAt = typeof getLocalISOString === 'function' ? getLocalISOString() : new Date().toISOString();
+            job.closedAt = end;
             job.closedBy = localStorage.getItem('user_name') || 'Tech';
 
             saveJob(job);
@@ -286,6 +295,7 @@
         }
 
         window.addEventListener('DOMContentLoaded', () => { setTimeout(loadJobs, 100); });
+        window.addEventListener('dms_jobs_updated', () => { setTimeout(loadJobs, 100); });
     </script>
     <script src="app_ui.js"></script>
 </body>
