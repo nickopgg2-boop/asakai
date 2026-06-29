@@ -193,7 +193,7 @@
                 tbody.innerHTML += `
                     <tr class="hover:bg-slate-800/50 transition-colors">
                         <td class="p-4 font-mono font-bold text-slate-300">${job.jobId}<br><span class="text-[10px] text-slate-500 font-normal"><i class="fa-regular fa-clock mr-1"></i>${displayTime}</span></td>
-                        <td class="p-4"><div class="flex items-center gap-2"><span class="text-[9px] font-bold ${deptColorText} ${deptColorBg} px-2 py-0.5 rounded border">${job.dept}</span><span class="font-bold text-slate-200">${job.dieId}</span></div><div class="text-[11px] text-slate-500 mt-1">${job.partName}</div></td>
+                        <td class="p-4"><div class="flex items-center gap-2"><span class="text-[9px] font-bold ${deptColorText} ${deptColorBg} px-2 py-0.5 rounded border">${job.dept}</span><span class="font-bold text-slate-200">${job.dieId}</span></div><div class="text-[11px] text-slate-500 mt-1">${job.partName || 'ไม่ระบุ Part'}${job.partNumber ? ' | ' + job.partNumber : ''}</div><div class="text-[10px] text-slate-600 mt-0.5">${job.model || ''}</div></td>
                         <td class="p-4"><div class="text-sm truncate max-w-[200px] text-slate-300">${job.defect}</div><div class="mt-1"><span class="text-[10px] font-bold px-2 py-0.5 rounded-md border ${isUrgent ? 'text-rose-400 bg-rose-500/10 border-rose-500/30 drop-shadow-[0_0_5px_rgba(244,63,94,0.5)]' : 'text-slate-400 bg-slate-800 border-slate-700'}">${job.jobType} | ${job.priority}</span></div></td>
                         <td class="p-4 text-center"><span class="text-[10px] font-bold px-3 py-1.5 rounded-lg border ${isWorking ? 'text-blue-400 bg-blue-500/10 border-blue-500/30 drop-shadow-[0_0_5px_rgba(59,130,246,0.5)] animate-pulse' : 'text-amber-400 bg-amber-500/10 border-amber-500/30'}">${isWorking ? '<i class="fa-solid fa-wrench mr-1"></i>กำลังซ่อม' : 'รอมอบหมาย'}</span></td>
                         <td class="p-4 text-right">
@@ -210,16 +210,23 @@
 
         function acceptJob(id) {
             const job = getAllJobs().find(j => j.jobId === id);
+            if (!job) return;
             job.status = 'in_progress';
+            if (!job.startTime) job.startTime = getCurrentDatetimeLocal();
             saveJob(job);
+            if (typeof showToast === 'function') showToast(`รับงาน ${id} แล้ว`, 'success');
             loadJobs();
         }
 
         function deleteJob(id) {
             if(confirm('⚠️ คำเตือน: คุณต้องการลบใบแจ้งซ่อมนี้ออกจากระบบใช่หรือไม่?')) {
-                let jobs = JSON.parse(localStorage.getItem('dms_jobs')) || [];
-                jobs = jobs.filter(j => j.jobId !== id);
-                localStorage.setItem('dms_jobs', JSON.stringify(jobs));
+                if (typeof deleteJobById === 'function') deleteJobById(id);
+                else {
+                    let jobs = JSON.parse(localStorage.getItem('dms_jobs')) || [];
+                    jobs = jobs.filter(j => j.jobId !== id);
+                    localStorage.setItem('dms_jobs', JSON.stringify(jobs));
+                }
+                if (typeof showToast === 'function') showToast(`ลบใบงาน ${id} แล้ว`, 'info');
                 loadJobs();
             }
         }
@@ -247,7 +254,11 @@
             const method = document.getElementById('mMethod').value;
             const cause = document.getElementById('mCause').value;
 
-            if(!start || !end || !method || !cause) { alert('⛔ กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบทุกช่อง'); return; }
+            if(!start || !end || !method || !cause) {
+                if (typeof showToast === 'function') showToast('กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบทุกช่อง', 'error');
+                else alert('กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบทุกช่อง');
+                return;
+            }
             
             const sTime = new Date(start).getTime();
             const eTime = new Date(end).getTime();
@@ -257,22 +268,25 @@
             if (dt < 0) { alert('⛔ เวลาจบงานต้องมากกว่าเวลาเริ่มงานเสมอครับ'); return; }
 
             const job = getAllJobs().find(j => j.jobId === id);
+            if (!job) return;
             job.startTime = start;
             job.endTime = end;
             job.repairMethod = method;
             job.rootCause = cause;
             job.downtimeMinutes = dt;
             job.status = 'closed';
-            job.closedAt = new Date().toISOString();
+            job.closedAt = typeof getLocalISOString === 'function' ? getLocalISOString() : new Date().toISOString();
             job.closedBy = localStorage.getItem('user_name') || 'Tech';
 
             saveJob(job);
             document.getElementById('repairModal').style.display = 'none';
-            alert('✅ ปิดงานสำเร็จ ข้อมูลบันทึกลงระบบ Engine แล้ว!');
+            if (typeof showToast === 'function') showToast(`ปิดงาน ${id} สำเร็จ บันทึก ${dt} นาที`, 'success');
+            else alert('ปิดงานสำเร็จ');
             loadJobs();
         }
 
         window.addEventListener('DOMContentLoaded', () => { setTimeout(loadJobs, 100); });
     </script>
+    <script src="app_ui.js"></script>
 </body>
 </html>

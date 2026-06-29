@@ -101,6 +101,7 @@
                     <i class="fa-solid fa-chart-pie text-blue-400"></i> ภาพรวมระบบซ่อมบำรุงแม่พิมพ์
                 </h2>
                 <p class="text-sm text-slate-500 mt-1">ข้อมูลสรุปสถิติตามช่วงเวลาที่คุณเลือก</p>
+                <p id="periodLabel" class="text-xs text-blue-400 mt-2 font-bold"></p>
             </div>
             
             <div class="flex flex-wrap items-center gap-2 bg-[#0f172a] p-2 rounded-2xl border border-darkborder">
@@ -109,7 +110,7 @@
                 <span class="text-slate-500">-</span>
                 <input type="date" id="filterEnd" class="bg-darkcard text-slate-200 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono outline-none focus:border-blue-500">
                 <button onclick="applyDateFilter()" class="bg-blue-600/20 border border-blue-500/50 text-blue-400 hover:bg-blue-500/30 px-4 py-2 rounded-xl text-xs font-bold shadow-[0_0_10px_rgba(59,130,246,0.3)] transition-all">ค้นหา</button>
-                <button onclick="resetDateFilter()" class="bg-slate-800 border border-slate-700 text-slate-400 hover:text-slate-200 hover:bg-slate-700 px-3 py-2 rounded-xl text-xs font-bold transition-all"><i class="fa-solid fa-rotate-left"></i></button>
+                <button onclick="resetDateFilter()" class="bg-slate-800 border border-slate-700 text-slate-400 hover:text-slate-200 hover:bg-slate-700 px-3 py-2 rounded-xl text-xs font-bold transition-all" title="กลับไปดูเดือนปัจจุบัน"><i class="fa-solid fa-calendar-days"></i></button>
             </div>
         </div>
 
@@ -181,21 +182,35 @@
         Chart.register(ChartDataLabels);
         let mainChart;
 
+        function setDefaultMonthFilter() {
+            const bounds = typeof getCurrentMonthBounds === 'function' ? getCurrentMonthBounds() : null;
+            if (!bounds) return;
+            document.getElementById('filterStart').value = bounds.startDate;
+            document.getElementById('filterEnd').value = bounds.endDate;
+        }
+
         function applyDateFilter() {
             const start = document.getElementById('filterStart').value;
             const end = document.getElementById('filterEnd').value;
+            if (start && end && start > end) {
+                if (typeof showToast === 'function') showToast('วันที่เริ่มต้นต้องไม่มากกว่าวันที่สิ้นสุด', 'error');
+                else alert('วันที่เริ่มต้นต้องไม่มากกว่าวันที่สิ้นสุด');
+                return;
+            }
             initDashboard(start, end);
         }
 
         function resetDateFilter() {
-            document.getElementById('filterStart').value = '';
-            document.getElementById('filterEnd').value = '';
-            initDashboard();
+            setDefaultMonthFilter();
+            applyDateFilter();
         }
 
         function initDashboard(startDate = null, endDate = null) {
             const kpis = typeof fetchAndCalculateKPIs === 'function' ? fetchAndCalculateKPIs(startDate, endDate) : null;
             if(!kpis) return;
+            const periodText = startDate && endDate ? `ช่วงข้อมูล: ${startDate} ถึง ${endDate}` : (startDate ? `ช่วงข้อมูล: ${startDate}` : 'ช่วงข้อมูล: ทั้งหมด');
+            const periodEl = document.getElementById('periodLabel');
+            if (periodEl) periodEl.innerText = periodText;
             
             document.getElementById('m-total').innerText = kpis.overall.totalJobs;
             document.getElementById('m-closed').innerText = kpis.overall.totalClosedJobs;
@@ -221,6 +236,7 @@
                 ]},
                 options: { 
                     responsive: true, maintainAspectRatio: false,
+                    animation: { duration: 700, easing: 'easeOutQuart' },
                     scales: {
                         x: { stacked: true, grid: { display: false }, ticks: { color: textColor, font: { family: 'Prompt' } } },
                         y: { stacked: true, grid: { color: gridColor, drawBorder: false }, ticks: { color: textColor } }
@@ -233,7 +249,11 @@
             });
         }
 
-        window.addEventListener('DOMContentLoaded', () => { setTimeout(() => initDashboard(), 100); });
+        window.addEventListener('DOMContentLoaded', () => {
+            setDefaultMonthFilter();
+            setTimeout(() => applyDateFilter(), 100);
+        });
     </script>
+    <script src="app_ui.js"></script>
 </body>
 </html>

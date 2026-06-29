@@ -3,32 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Status Tracking - DMS 4.0</title>
-    
+    <title>Kanban Status Board - DMS 4.0</title>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
     <script src="data_engine.js"></script>
     <script>
-        tailwind.config = { 
-            darkMode: 'class', 
-            theme: { 
-                extend: { 
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
                     fontFamily: { sans: ['Prompt', 'sans-serif'] },
                     colors: { darkbg: '#0b1120', darkcard: '#151f32', darkborder: '#1e293b' }
-                } 
-            } 
+                }
+            }
         };
-        
+
         function checkAccess() {
             const userRole = localStorage.getItem('user_role');
             if (!userRole) { window.location.replace("page_login.html"); return; }
         }
         function handleLogout() {
-            if (confirm("คุณต้องการออกจากระบบใช่หรือไม่?")) { 
+            if (confirm("คุณต้องการออกจากระบบใช่หรือไม่?")) {
                 localStorage.removeItem('user_role');
-                window.location.replace("page_login.html"); 
+                window.location.replace("page_login.html");
             }
         }
         function hideUnauthorizedMenus() {
@@ -50,22 +50,38 @@
         }
         document.addEventListener('DOMContentLoaded', () => {
             document.documentElement.classList.add('dark');
-            checkAccess(); hideUnauthorizedMenus();
+            checkAccess();
+            hideUnauthorizedMenus();
         });
     </script>
     <style>
         body { background-color: #0b1120; color: #94a3b8; }
-        .kanban-col { height: calc(100vh - 270px); min-height: 500px; }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
         .cyber-card { background-color: #151f32; border: 1px solid #1e293b; border-radius: 1rem; }
-        
-        /* สไตล์สำหรับโหมด TV (Andon) */
+        .kanban-col { height: calc(100vh - 315px); min-height: 520px; }
+        .kanban-dropzone { transition: background-color .18s ease, box-shadow .18s ease, border-color .18s ease; }
+        .kanban-dropzone.drag-over { background: rgba(59,130,246,.08); box-shadow: inset 0 0 0 1px rgba(59,130,246,.32), inset 0 0 30px rgba(59,130,246,.08); }
+        .kanban-card { cursor: grab; user-select: none; touch-action: manipulation; }
+        .kanban-card:active { cursor: grabbing; }
+        .kanban-card.readonly-card { cursor: not-allowed !important; }
+        .kanban-card.readonly-card:active { cursor: not-allowed !important; }
+        .readonly-select { opacity: .55; pointer-events: none; }
+        .kanban-card.sortable-ghost { opacity: .35; transform: rotate(1deg) scale(.98); }
+        .kanban-card.sortable-chosen { box-shadow: 0 20px 55px rgba(2,6,23,.55), 0 0 20px rgba(59,130,246,.18); border-color: rgba(96,165,250,.55); }
+        .kanban-empty { border: 1px dashed rgba(100,116,139,.3); background: rgba(15,23,42,.36); }
+        .status-chip { border: 1px solid rgba(148,163,184,.18); }
+        .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
         .andon-mode header { display: none !important; }
         .andon-mode .filter-section { display: none !important; }
         .andon-mode main { max-width: 100% !important; width: 100% !important; padding: 1.5rem !important; }
-        .andon-mode .kanban-col { height: calc(100vh - 150px); }
+        .andon-mode .kanban-col { height: calc(100vh - 165px); }
         .andon-mode #exitAndonBtn { display: flex !important; }
+
+        @media (max-width: 1024px) {
+            .kanban-col { height: 68vh; min-height: 480px; }
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col font-prompt selection:bg-blue-500/30">
@@ -83,10 +99,10 @@
                     </div>
                     <div>
                         <h1 class="font-bold text-slate-200 tracking-wider leading-tight text-sm uppercase">DMS 4.0</h1>
-                        <p class="text-[10px] text-slate-500">Live Status Tracking</p>
+                        <p class="text-[10px] text-slate-500">Drag & Drop Kanban Board</p>
                     </div>
                 </div>
-                
+
                 <div id="main-nav" class="hidden xl:flex items-center space-x-1 border border-darkborder rounded-xl p-1.5 bg-[#0f172a] shadow-inner mx-4 overflow-x-auto scrollbar-hide">
                     <a href="page_dashboard.html" data-roles="executive" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-chart-pie mr-2"></i> Dashboard</a>
                     <a href="page_reliability_dashboard.html" data-roles="executive" class="text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex items-center"><i class="fa-solid fa-gauge-high mr-2"></i> Reliability</a>
@@ -106,111 +122,403 @@
         </div>
     </header>
 
-    <main class="flex-1 p-4 lg:p-8 space-y-6 overflow-hidden max-w-[1800px] mx-auto w-full flex flex-col">
-        
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 filter-section shrink-0">
-            <div class="cyber-card p-4 flex items-center justify-between">
-                <div><p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">รอมอบหมาย (Pending)</p><h3 class="text-2xl font-bold text-slate-200 font-mono"><span id="sum-pending">0</span></h3></div>
-                <div class="w-10 h-10 rounded-full bg-slate-800/50 text-slate-400 flex items-center justify-center text-xl border border-slate-700"><i class="fa-solid fa-inbox"></i></div>
+    <main class="flex-1 p-4 lg:p-8 space-y-5 overflow-hidden max-w-[1900px] mx-auto w-full flex flex-col">
+        <section class="filter-section shrink-0 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+            <div>
+                <h2 class="text-2xl font-bold text-slate-200 flex items-center gap-2"><i class="fa-solid fa-table-columns text-blue-400"></i> Kanban Status Board</h2>
+                <p class="text-xs text-slate-500 mt-1">ช่างซ่อม/หัวหน้างานลากการ์ดเพื่อเปลี่ยนสถานะ ส่วนฝ่ายผลิตดูสถานะได้อย่างเดียว</p>
             </div>
-            <div class="bg-blue-600/20 border border-blue-500/50 text-blue-400 p-4 rounded-2xl flex items-center justify-between shadow-[0_0_15px_rgba(59,130,246,0.3)]">
-                <div><p class="text-[10px] font-bold uppercase tracking-wider mb-1">กำลังซ่อม (In Progress)</p><h3 class="text-2xl font-bold text-blue-400 font-mono drop-shadow-[0_0_5px_rgba(59,130,246,0.8)]"><span id="sum-progress">0</span></h3></div>
-                <div class="w-10 h-10 rounded-full bg-blue-500/30 flex items-center justify-center text-xl animate-pulse"><i class="fa-solid fa-wrench"></i></div>
+            <div class="flex flex-wrap gap-2">
+                <button onclick="renderBoard(true)" class="bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700 px-4 py-2.5 rounded-xl text-xs font-bold transition-all"><i class="fa-solid fa-rotate mr-1.5"></i> รีเฟรชบอร์ด</button>
+                <button onclick="toggleAndonMode()" class="bg-blue-600/20 border border-blue-500/40 text-blue-400 hover:bg-blue-500/25 px-4 py-2.5 rounded-xl text-xs font-bold transition-all"><i class="fa-solid fa-tv mr-1.5"></i> โหมด TV</button>
             </div>
-            <div class="cyber-card p-4 flex items-center justify-between">
-                <div><p class="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1">เสร็จสิ้น (Closed)</p><h3 class="text-2xl font-bold text-emerald-400 font-mono drop-shadow-[0_0_5px_rgba(52,211,153,0.5)]"><span id="sum-closed">0</span></h3></div>
-                <div class="w-10 h-10 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center text-xl border border-emerald-500/30"><i class="fa-solid fa-check-double"></i></div>
-            </div>
+        </section>
+
+        <div id="productionViewOnlyNotice" class="hidden filter-section shrink-0 bg-amber-500/10 border border-amber-500/40 text-amber-300 px-4 py-3 rounded-2xl text-sm font-medium">
+            <i class="fa-solid fa-eye mr-2"></i>
+            โหมดฝ่ายผลิต: สามารถดูสถานะใบงานได้อย่างเดียว ไม่สามารถลากการ์ด แก้ไขสถานะ หรือปิดงานได้
         </div>
 
-        <div class="flex-1 overflow-x-auto pb-4 scrollbar-hide">
-            <div class="flex gap-4 min-w-[800px] h-full">
-                
-                <div class="flex-1 bg-darkbg rounded-2xl flex flex-col border border-darkborder overflow-hidden">
+        <section class="grid grid-cols-2 md:grid-cols-5 gap-3 filter-section shrink-0" id="summary-cards"></section>
+
+        <section class="flex-1 overflow-x-auto pb-4 scrollbar-hide">
+            <div class="grid grid-cols-5 gap-4 min-w-[1280px] h-full" id="kanban-board">
+                <div class="bg-darkbg rounded-2xl flex flex-col border border-darkborder overflow-hidden" data-status-wrap="pending">
                     <div class="p-3 bg-darkcard border-b border-darkborder flex justify-between items-center shrink-0">
-                        <h3 class="font-bold text-slate-300 text-sm flex items-center gap-2"><i class="fa-solid fa-inbox text-slate-500"></i> รอมอบหมาย</h3>
+                        <h3 class="font-bold text-slate-300 text-sm flex items-center gap-2"><i class="fa-solid fa-inbox text-slate-500"></i> รอรับงาน</h3>
+                        <span class="font-mono text-xs text-slate-400" id="count-pending">0</span>
                     </div>
-                    <div class="p-3 overflow-y-auto kanban-col space-y-3 scrollbar-hide" id="col-pending"></div>
+                    <div class="p-3 overflow-y-auto kanban-col kanban-dropzone space-y-3 scrollbar-hide" id="col-pending" data-status="pending"></div>
                 </div>
 
-                <div class="flex-1 bg-blue-900/10 rounded-2xl flex flex-col border border-blue-900/50 overflow-hidden shadow-[inset_0_0_20px_rgba(59,130,246,0.05)]">
+                <div class="bg-blue-900/10 rounded-2xl flex flex-col border border-blue-900/50 overflow-hidden shadow-[inset_0_0_20px_rgba(59,130,246,0.05)]" data-status-wrap="in_progress">
                     <div class="p-3 bg-blue-900/30 border-b border-blue-800/50 flex justify-between items-center shrink-0">
                         <h3 class="font-bold text-blue-400 text-sm flex items-center gap-2 drop-shadow-[0_0_5px_rgba(59,130,246,0.5)]"><i class="fa-solid fa-wrench"></i> กำลังซ่อม</h3>
+                        <span class="font-mono text-xs text-blue-300" id="count-in_progress">0</span>
                     </div>
-                    <div class="p-3 overflow-y-auto kanban-col space-y-3 scrollbar-hide" id="col-progress"></div>
+                    <div class="p-3 overflow-y-auto kanban-col kanban-dropzone space-y-3 scrollbar-hide" id="col-in_progress" data-status="in_progress"></div>
                 </div>
 
-                <div class="flex-1 bg-emerald-900/10 rounded-2xl flex flex-col border border-emerald-900/50 overflow-hidden">
+                <div class="bg-amber-900/10 rounded-2xl flex flex-col border border-amber-900/50 overflow-hidden" data-status-wrap="waiting_parts">
+                    <div class="p-3 bg-amber-900/30 border-b border-amber-800/50 flex justify-between items-center shrink-0">
+                        <h3 class="font-bold text-amber-400 text-sm flex items-center gap-2"><i class="fa-solid fa-boxes-stacked"></i> รออะไหล่</h3>
+                        <span class="font-mono text-xs text-amber-300" id="count-waiting_parts">0</span>
+                    </div>
+                    <div class="p-3 overflow-y-auto kanban-col kanban-dropzone space-y-3 scrollbar-hide" id="col-waiting_parts" data-status="waiting_parts"></div>
+                </div>
+
+                <div class="bg-purple-900/10 rounded-2xl flex flex-col border border-purple-900/50 overflow-hidden" data-status-wrap="waiting_test">
+                    <div class="p-3 bg-purple-900/30 border-b border-purple-800/50 flex justify-between items-center shrink-0">
+                        <h3 class="font-bold text-purple-400 text-sm flex items-center gap-2"><i class="fa-solid fa-vial-circle-check"></i> รอทดสอบ</h3>
+                        <span class="font-mono text-xs text-purple-300" id="count-waiting_test">0</span>
+                    </div>
+                    <div class="p-3 overflow-y-auto kanban-col kanban-dropzone space-y-3 scrollbar-hide" id="col-waiting_test" data-status="waiting_test"></div>
+                </div>
+
+                <div class="bg-emerald-900/10 rounded-2xl flex flex-col border border-emerald-900/50 overflow-hidden" data-status-wrap="closed">
                     <div class="p-3 bg-emerald-900/30 border-b border-emerald-800/50 flex justify-between items-center shrink-0">
                         <h3 class="font-bold text-emerald-400 text-sm flex items-center gap-2"><i class="fa-solid fa-check-double"></i> เสร็จสิ้น</h3>
+                        <span class="font-mono text-xs text-emerald-300" id="count-closed">0</span>
                     </div>
-                    <div class="p-3 overflow-y-auto kanban-col space-y-3 scrollbar-hide" id="col-closed"></div>
+                    <div class="p-3 overflow-y-auto kanban-col kanban-dropzone space-y-3 scrollbar-hide" id="col-closed" data-status="closed"></div>
                 </div>
-
             </div>
-        </div>
+        </section>
     </main>
 
     <script>
+        const STATUS_CONFIG = {
+            pending: { label: 'รอรับงาน', icon: 'fa-inbox', color: 'slate', toast: 'ย้ายกลับไปรอรับงานแล้ว' },
+            in_progress: { label: 'กำลังซ่อม', icon: 'fa-wrench', color: 'blue', toast: 'เริ่ม/ย้ายเข้ากำลังซ่อมแล้ว' },
+            waiting_parts: { label: 'รออะไหล่', icon: 'fa-boxes-stacked', color: 'amber', toast: 'ย้ายไปรออะไหล่แล้ว' },
+            waiting_test: { label: 'รอทดสอบ', icon: 'fa-vial-circle-check', color: 'purple', toast: 'ย้ายไปรอทดสอบแล้ว' },
+            closed: { label: 'เสร็จสิ้น', icon: 'fa-check-double', color: 'emerald', toast: 'ปิดงานจาก Kanban แล้ว' }
+        };
+        const STATUS_KEYS = Object.keys(STATUS_CONFIG);
+        const currentRole = localStorage.getItem('user_role');
+        const canEditKanban = currentRole === 'executive' || currentRole === 'technician';
+        const isProduction = currentRole === 'production';
+        let sortableReady = false;
+        let isDragging = false;
+
+        function escapeHTML(value) {
+            return String(value ?? '').replace(/[&<>'"]/g, char => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+            }[char]));
+        }
+
+        function normalizeBoardStatus(status) {
+            if (status === 'done') return 'closed';
+            if (status === 'to_do') return 'pending';
+            if (STATUS_CONFIG[status]) return status;
+            return 'pending';
+        }
+
+        function getStatusLabel(status) {
+            const key = normalizeBoardStatus(status);
+            return STATUS_CONFIG[key].label;
+        }
+
+        function getNowLocal() {
+            return typeof getLocalISOString === 'function' ? getLocalISOString() : new Date().toISOString();
+        }
+
+        function formatDateTimeShort(value) {
+            if (!value) return '-';
+            const text = String(value).replace('T', ' ');
+            return text.slice(0, 16);
+        }
+
+        function createStatusSelect(job) {
+            const current = normalizeBoardStatus(job.status);
+            const disabledAttr = canEditKanban ? '' : 'disabled';
+            const readonlyClass = canEditKanban ? '' : 'readonly-select';
+            return `
+                <select aria-label="เปลี่ยนสถานะ" ${disabledAttr} onchange="changeStatusFromSelect(event, '${escapeHTML(job.jobId)}')" class="${readonlyClass} bg-[#0f172a] border border-slate-700 text-slate-300 text-[10px] rounded-lg px-2 py-1 outline-none focus:border-blue-500">
+                    ${STATUS_KEYS.map(key => `<option value="${key}" ${key === current ? 'selected' : ''}>${STATUS_CONFIG[key].label}</option>`).join('')}
+                </select>
+            `;
+        }
+
         function createCardHTML(job) {
-            const isUrgent = job.priority === 'ด่วน';
+            const status = normalizeBoardStatus(job.status);
+            const isUrgent = job.priority === 'ด่วน' || job.priority === 'Critical' || job.priority === 'High';
             const isPM = job.jobType === 'PM';
-            
-            let deptColorText = job.dept === 'L-D' ? 'text-orange-400' : (job.dept === 'P-D' ? 'text-purple-400' : 'text-blue-400');
-            let deptColorBg = job.dept === 'L-D' ? 'bg-orange-500/10 border-orange-500/30' : (job.dept === 'P-D' ? 'bg-purple-500/10 border-purple-500/30' : 'bg-blue-500/10 border-blue-500/30');
-            
-            let borderColor = isUrgent ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)]' : (isPM ? 'bg-emerald-500' : 'bg-blue-500');
+            const deptColorText = job.dept === 'L-D' ? 'text-orange-400' : (job.dept === 'P-D' ? 'text-purple-400' : 'text-blue-400');
+            const deptColorBg = job.dept === 'L-D' ? 'bg-orange-500/10 border-orange-500/30' : (job.dept === 'P-D' ? 'bg-purple-500/10 border-purple-500/30' : 'bg-blue-500/10 border-blue-500/30');
+            const sideBar = isUrgent ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)]' : (isPM ? 'bg-emerald-500' : 'bg-blue-500');
+            const statusText = getStatusLabel(status);
+            const cardModeClass = canEditKanban ? '' : 'readonly-card opacity-90';
+            const draggableAttr = canEditKanban ? 'true' : 'false';
+            const actionHint = canEditKanban ? 'ลากการ์ดเพื่อย้ายช่อง' : 'ฝ่ายผลิตดูได้อย่างเดียว';
 
             return `
-                <div class="cyber-card p-3 relative overflow-hidden transition-colors hover:bg-slate-800/50">
-                    <div class="absolute top-0 left-0 w-1 h-full ${borderColor}"></div>
-                    <div class="pl-2">
-                        <div class="flex justify-between items-start mb-1.5">
-                            <span class="font-mono font-bold text-slate-300 text-[11px]">${job.jobId}</span>
-                            ${isUrgent ? '<span class="text-[9px] font-bold text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/30 shadow-[0_0_5px_rgba(244,63,94,0.3)]">ด่วน</span>' : ''}
+                <article class="kanban-card ${cardModeClass} cyber-card p-3 relative overflow-hidden hover:bg-slate-800/50" draggable="${draggableAttr}" data-job-id="${escapeHTML(job.jobId)}" data-current-status="${status}">
+                    <div class="absolute top-0 left-0 w-1 h-full ${sideBar}"></div>
+                    <div class="pl-2 space-y-2">
+                        <div class="flex justify-between items-start gap-2">
+                            <span class="font-mono font-bold text-slate-300 text-[11px] break-all">${escapeHTML(job.jobId)}</span>
+                            ${isUrgent ? '<span class="text-[9px] font-bold text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded status-chip shadow-[0_0_5px_rgba(244,63,94,0.3)] shrink-0">ด่วน</span>' : ''}
                         </div>
-                        <div class="flex items-center gap-1.5 mb-1">
-                            <span class="text-[9px] font-bold ${deptColorText} ${deptColorBg} px-1.5 py-0.5 rounded border">${job.dept}</span>
-                            <span class="font-bold text-slate-200 text-xs">${job.dieId}</span>
+
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            <span class="text-[9px] font-bold ${deptColorText} ${deptColorBg} px-1.5 py-0.5 rounded border">${escapeHTML(job.dept)}</span>
+                            <span class="text-[9px] font-bold ${isPM ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' : 'text-amber-400 bg-amber-500/10 border-amber-500/30'} px-1.5 py-0.5 rounded border">${escapeHTML(job.jobType || 'BM')}</span>
+                            <span class="text-[9px] font-bold text-slate-300 bg-slate-800/80 px-1.5 py-0.5 rounded status-chip">${escapeHTML(statusText)}</span>
                         </div>
-                        <p class="text-[10px] text-slate-400 line-clamp-2 mt-1" title="${job.defect}">${job.defect}</p>
+
+                        <div>
+                            <h4 class="font-bold text-slate-100 text-sm leading-snug">${escapeHTML(job.dieId)}</h4>
+                            <p class="text-[10px] text-slate-500 mt-0.5">${escapeHTML(job.partName || 'ไม่ระบุ Part')}${job.partNumber ? ' | ' + escapeHTML(job.partNumber) : ''}</p>
+                            ${job.model ? `<p class="text-[10px] text-slate-600">Model: ${escapeHTML(job.model)}</p>` : ''}
+                        </div>
+
+                        <p class="text-[11px] text-slate-400 line-clamp-2" title="${escapeHTML(job.defect)}">${escapeHTML(job.defect || 'ไม่มีรายละเอียดปัญหา')}</p>
+
+                        <div class="grid grid-cols-2 gap-2 text-[10px] text-slate-500 pt-1 border-t border-slate-800/80">
+                            <div><span class="block text-slate-600">วันที่งาน</span><span class="font-mono text-slate-400">${escapeHTML(job.plannedDate || '-')}</span></div>
+                            <div><span class="block text-slate-600">เริ่มงาน</span><span class="font-mono text-slate-400">${escapeHTML(formatDateTimeShort(job.startTime))}</span></div>
+                        </div>
+
+                        <div class="flex items-center justify-between gap-2 pt-1">
+                            <span class="text-[10px] text-slate-600">${actionHint}</span>
+                            ${createStatusSelect(job)}
+                        </div>
                     </div>
+                </article>
+            `;
+        }
+
+        function createEmptyHTML(label) {
+            return `<div class="kanban-empty rounded-xl p-4 text-center text-[11px] text-slate-600">ไม่มีงานในช่อง ${escapeHTML(label)}</div>`;
+        }
+
+        function createSummaryCard(key, count) {
+            const cfg = STATUS_CONFIG[key];
+            const colorClass = {
+                pending: 'text-slate-300 bg-slate-800/60 border-slate-700',
+                in_progress: 'text-blue-400 bg-blue-500/10 border-blue-500/30',
+                waiting_parts: 'text-amber-400 bg-amber-500/10 border-amber-500/30',
+                waiting_test: 'text-purple-400 bg-purple-500/10 border-purple-500/30',
+                closed: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30'
+            }[key];
+            return `
+                <div class="cyber-card p-4 flex items-center justify-between">
+                    <div>
+                        <p class="text-[10px] font-bold uppercase tracking-wider mb-1 ${colorClass.split(' ')[0]}">${cfg.label}</p>
+                        <h3 class="text-2xl font-bold font-mono ${colorClass.split(' ')[0]}">${count}</h3>
+                    </div>
+                    <div class="w-10 h-10 rounded-full ${colorClass} flex items-center justify-center text-lg border"><i class="fa-solid ${cfg.icon}"></i></div>
                 </div>
             `;
         }
 
-        function renderBoard() {
-            let dbJobs = typeof getAllJobs === 'function' ? getAllJobs() : [];
-
-            const colPending = document.getElementById('col-pending');
-            const colInProgress = document.getElementById('col-progress');
-            const colClosed = document.getElementById('col-closed');
-
-            colPending.innerHTML = '';
-            colInProgress.innerHTML = '';
-            colClosed.innerHTML = '';
-
-            let cPending = 0, cProgress = 0, cClosed = 0;
-
-            dbJobs.forEach(job => {
-                const cardHtml = createCardHTML(job);
-                if (job.status === 'pending' || job.status === 'to_do') {
-                    colPending.innerHTML += cardHtml; cPending++;
-                } else if (job.status === 'in_progress') {
-                    colInProgress.innerHTML += cardHtml; cProgress++;
-                } else if (job.status === 'closed' || job.status === 'done') {
-                    colClosed.innerHTML += cardHtml; cClosed++;
-                }
-            });
-
-            document.getElementById('sum-pending').innerText = cPending;
-            document.getElementById('sum-progress').innerText = cProgress;
-            document.getElementById('sum-closed').innerText = cClosed;
+        function getBoardJobs() {
+            return typeof getAllJobs === 'function' ? getAllJobs() : [];
         }
 
-        window.addEventListener('DOMContentLoaded', () => { 
-            setTimeout(() => { renderBoard(); setInterval(renderBoard, 3000); }, 200); 
+        function renderBoard(forceToast = false) {
+            if (isDragging) return;
+            const jobs = getBoardJobs();
+            const counts = Object.fromEntries(STATUS_KEYS.map(key => [key, 0]));
+            const buckets = Object.fromEntries(STATUS_KEYS.map(key => [key, []]));
+
+            jobs.forEach(job => {
+                const status = normalizeBoardStatus(job.status);
+                counts[status] += 1;
+                buckets[status].push(job);
+            });
+
+            STATUS_KEYS.forEach(key => {
+                const col = document.getElementById(`col-${key}`);
+                const count = document.getElementById(`count-${key}`);
+                if (!col) return;
+                col.innerHTML = buckets[key].length ? buckets[key].map(createCardHTML).join('') : createEmptyHTML(STATUS_CONFIG[key].label);
+                if (count) count.innerText = counts[key];
+            });
+
+            const summary = document.getElementById('summary-cards');
+            if (summary) summary.innerHTML = STATUS_KEYS.map(key => createSummaryCard(key, counts[key])).join('');
+
+            initDragAndDrop();
+            if (forceToast && typeof showToast === 'function') showToast('รีเฟรช Kanban Board แล้ว', 'info');
+        }
+
+        function findJobById(jobId) {
+            return getBoardJobs().find(job => String(job.jobId) === String(jobId));
+        }
+
+        function updateJobStatus(jobId, newStatus) {
+            if (!canEditKanban) {
+                renderBoard();
+                if (typeof showToast === 'function') showToast('ฝ่ายผลิตสามารถดูสถานะได้อย่างเดียว', 'warning');
+                return;
+            }
+            newStatus = normalizeBoardStatus(newStatus);
+            const job = findJobById(jobId);
+            if (!job) {
+                renderBoard();
+                if (typeof showToast === 'function') showToast('ไม่พบใบงานนี้ในระบบ', 'error');
+                return;
+            }
+
+            const oldStatus = normalizeBoardStatus(job.status);
+            if (oldStatus === newStatus) {
+                renderBoard();
+                return;
+            }
+
+            const now = getNowLocal();
+            job.status = newStatus;
+
+            if (newStatus !== 'pending' && !job.startTime) {
+                job.startTime = now;
+            }
+
+            if (newStatus === 'pending') {
+                job.startTime = null;
+                job.endTime = null;
+                job.closedAt = null;
+                job.closedBy = null;
+                job.downtimeMinutes = null;
+            }
+
+            if (oldStatus === 'closed' && newStatus !== 'closed') {
+                job.endTime = null;
+                job.closedAt = null;
+                job.closedBy = null;
+                job.downtimeMinutes = null;
+            }
+
+            if (newStatus === 'closed') {
+                if (!job.startTime) job.startTime = now;
+                job.endTime = now;
+                job.closedAt = now;
+                job.closedBy = localStorage.getItem('user_name') || localStorage.getItem('user_role') || 'Kanban';
+                job.repairMethod = job.repairMethod || 'อัปเดตสถานะจาก Kanban Board';
+                job.rootCause = job.rootCause || 'รอระบุรายละเอียดเพิ่มเติม';
+                if (typeof calculateJobDowntimeMinutes === 'function') {
+                    job.downtimeMinutes = calculateJobDowntimeMinutes(job) || 0;
+                }
+            }
+
+            if (typeof saveJob === 'function') saveJob(job);
+            renderBoard();
+            if (typeof showToast === 'function') showToast(STATUS_CONFIG[newStatus].toast, newStatus === 'closed' ? 'success' : 'info');
+        }
+
+        function changeStatusFromSelect(event, jobId) {
+            event.stopPropagation();
+            if (!canEditKanban) {
+                event.preventDefault();
+                renderBoard();
+                if (typeof showToast === 'function') showToast('ฝ่ายผลิตสามารถดูสถานะได้อย่างเดียว', 'warning');
+                return;
+            }
+            updateJobStatus(jobId, event.target.value);
+        }
+
+        function initDragAndDrop() {
+            if (!canEditKanban) {
+                sortableReady = true;
+                return;
+            }
+            if (sortableReady && window.Sortable) return;
+
+            if (window.Sortable) {
+                STATUS_KEYS.forEach(key => {
+                    const el = document.getElementById(`col-${key}`);
+                    if (!el || el.dataset.sortableReady === '1') return;
+                    Sortable.create(el, {
+                        group: 'dms-kanban',
+                        animation: 180,
+                        draggable: '.kanban-card',
+                        ghostClass: 'sortable-ghost',
+                        chosenClass: 'sortable-chosen',
+                        dragClass: 'sortable-drag',
+                        filter: 'select, option, button, a',
+                        preventOnFilter: false,
+                        onStart: () => { isDragging = true; },
+                        onEnd: evt => {
+                            isDragging = false;
+                            const card = evt.item;
+                            const jobId = card?.dataset?.jobId;
+                            const newStatus = evt.to?.dataset?.status;
+                            if (jobId && newStatus) updateJobStatus(jobId, newStatus);
+                            else renderBoard();
+                        },
+                        onMove: evt => {
+                            document.querySelectorAll('.kanban-dropzone').forEach(zone => zone.classList.remove('drag-over'));
+                            evt.to?.classList.add('drag-over');
+                            return true;
+                        }
+                    });
+                    el.dataset.sortableReady = '1';
+                });
+                sortableReady = true;
+                return;
+            }
+
+            // Fallback กรณี CDN SortableJS โหลดไม่ได้: ใช้ HTML5 Drag & Drop สำหรับ Desktop
+            document.querySelectorAll('.kanban-card').forEach(card => {
+                if (card.dataset.nativeDragReady === '1') return;
+                card.addEventListener('dragstart', event => {
+                    if (!canEditKanban) {
+                        event.preventDefault();
+                        if (typeof showToast === 'function') showToast('ฝ่ายผลิตสามารถดูสถานะได้อย่างเดียว', 'warning');
+                        return;
+                    }
+                    isDragging = true;
+                    event.dataTransfer.setData('text/plain', card.dataset.jobId);
+                    event.dataTransfer.effectAllowed = 'move';
+                    card.classList.add('opacity-50');
+                });
+                card.addEventListener('dragend', () => {
+                    isDragging = false;
+                    card.classList.remove('opacity-50');
+                    document.querySelectorAll('.kanban-dropzone').forEach(zone => zone.classList.remove('drag-over'));
+                });
+                card.dataset.nativeDragReady = '1';
+            });
+
+            document.querySelectorAll('.kanban-dropzone').forEach(zone => {
+                if (zone.dataset.nativeDropReady === '1') return;
+                zone.addEventListener('dragover', event => {
+                    event.preventDefault();
+                    zone.classList.add('drag-over');
+                });
+                zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+                zone.addEventListener('drop', event => {
+                    event.preventDefault();
+                    if (!canEditKanban) {
+                        zone.classList.remove('drag-over');
+                        if (typeof showToast === 'function') showToast('ฝ่ายผลิตสามารถดูสถานะได้อย่างเดียว', 'warning');
+                        return;
+                    }
+                    zone.classList.remove('drag-over');
+                    const jobId = event.dataTransfer.getData('text/plain');
+                    if (jobId) updateJobStatus(jobId, zone.dataset.status);
+                });
+                zone.dataset.nativeDropReady = '1';
+            });
+        }
+
+        window.addEventListener('dms_jobs_updated', () => renderBoard());
+        window.addEventListener('storage', event => {
+            if (event.key === 'dms_jobs') renderBoard();
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (isProduction) {
+                const notice = document.getElementById('productionViewOnlyNotice');
+                if (notice) notice.classList.remove('hidden');
+            }
+            setTimeout(() => {
+                renderBoard();
+                setInterval(() => { if (!isDragging) renderBoard(); }, 10000);
+            }, 200);
         });
     </script>
+    <script src="app_ui.js"></script>
 </body>
 </html>

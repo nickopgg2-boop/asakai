@@ -123,10 +123,7 @@
         let dieDataList = [];
 
         window.onload = () => {
-            const kpis = typeof fetchAndCalculateKPIs === 'function' ? fetchAndCalculateKPIs() : null;
-            if(!kpis) return;
-
-            const badActors = kpis.topBadActors;
+            const badActors = typeof getDieMasterData === 'function' ? getDieMasterData() : ((typeof fetchAndCalculateKPIs === 'function' ? fetchAndCalculateKPIs().topBadActors : []) || []);
             dieDataList = badActors; 
             const tbody = document.getElementById('dieTableBody');
             
@@ -141,7 +138,7 @@
 
                     tbody.innerHTML += `
                         <tr class="hover:bg-slate-800/50 transition-colors">
-                            <td class="p-5 font-bold text-blue-400 font-mono text-base drop-shadow-[0_0_5px_rgba(59,130,246,0.5)]">${die.dieId}</td>
+                            <td class="p-5 font-bold text-blue-400 font-mono text-base drop-shadow-[0_0_5px_rgba(59,130,246,0.5)]">${die.dieId}<div class="text-[10px] text-slate-500 font-sans font-medium mt-1">${die.partName || ''}${die.partNumber ? ' | ' + die.partNumber : ''}${die.model ? ' | ' + die.model : ''}</div></td>
                             <td class="p-5 text-center font-mono font-bold text-slate-200 text-base">${die.breakdownCount}</td>
                             <td class="p-5 text-center text-rose-400 font-bold text-base drop-shadow-[0_0_5px_rgba(244,63,94,0.5)]">${die.totalRepairMinutes}</td>
                             <td class="p-5 text-center font-mono text-base">${die.mttrEstimate}</td>
@@ -163,7 +160,7 @@
                 if (die.mtbfEstimate < 200) statusText = "วิกฤต (ต้อง Modify)";
                 else if (die.mtbfEstimate < 400) statusText = "เฝ้าระวัง";
 
-                let row = `${die.dieId},${die.breakdownCount},${die.totalRepairMinutes},${die.mttrEstimate},${die.mtbfEstimate},${statusText}`;
+                let row = `${die.dieId},${die.partName || ''},${die.partNumber || ''},${die.model || ''},${die.breakdownCount},${die.totalRepairMinutes},${die.mttrEstimate},${die.mtbfEstimate},${statusText}`;
                 csvContent += row + "\n";
             });
 
@@ -177,5 +174,6 @@
             document.body.removeChild(link);
         }
     </script>
+    <script src="app_ui.js"></script>
 </body>
 </html>

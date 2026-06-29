@@ -164,6 +164,18 @@
                             <label class="block text-xs font-bold text-slate-400 uppercase mb-2">รหัสแม่พิมพ์ (Die ID) <span class="text-rose-500">*</span></label>
                             <input type="text" id="dieId" required placeholder="เช่น DIE-123" class="w-full bg-[#0f172a] text-slate-200 border border-slate-700 rounded-xl px-4 py-3 text-sm font-mono uppercase outline-none focus:border-blue-500">
                         </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 uppercase mb-2">ชื่อ Part <span class="text-rose-500">*</span></label>
+                            <input type="text" id="partName" required placeholder="เช่น BRACKET-LH" class="w-full bg-[#0f172a] text-slate-200 border border-slate-700 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Part Number <span class="text-rose-500">*</span></label>
+                            <input type="text" id="partNumber" required placeholder="เช่น 12345-ABC" class="w-full bg-[#0f172a] text-slate-200 border border-slate-700 rounded-xl px-4 py-3 text-sm font-mono uppercase outline-none focus:border-blue-500">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Model <span class="text-rose-500">*</span></label>
+                            <input type="text" id="model" required placeholder="เช่น MODEL-A / LINE-01" class="w-full bg-[#0f172a] text-slate-200 border border-slate-700 rounded-xl px-4 py-3 text-sm uppercase outline-none focus:border-blue-500">
+                        </div>
                     </div>
                 </div>
 
@@ -222,34 +234,59 @@
     <script>
         function submitForm(e) {
             e.preventDefault();
-            const sap = document.getElementById('sapRef').value;
+            const sap = document.getElementById('sapRef').value.trim();
             const dept = document.getElementById('dept').value;
-            const dieId = document.getElementById('dieId').value;
-            const rawDefect = document.getElementById('problemDesc').value;
-            const priority = document.querySelector('input[name="priority"]:checked').value;
+            const dieId = document.getElementById('dieId').value.trim();
+            const partName = document.getElementById('partName').value.trim();
+            const partNumber = document.getElementById('partNumber').value.trim();
+            const model = document.getElementById('model').value.trim();
+            const rawDefect = document.getElementById('problemDesc').value.trim();
+            const priorityInput = document.querySelector('input[name="priority"]:checked');
+            const priority = priorityInput ? priorityInput.value : '';
             const jobType = document.getElementById('jobType').value;
-            const requestAt = document.getElementById('requestAt').value; 
+            const requestAt = document.getElementById('requestAt').value;
             const stockVal = document.getElementById('stockValue').value;
             const stockUnit = document.getElementById('stockUnit').value;
-            
+
+            if (!sap || !dept || !dieId || !partName || !partNumber || !model || !rawDefect || !priority || !requestAt || stockVal === '') {
+                if (typeof showToast === 'function') showToast('กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบทุกช่อง', 'error');
+                else alert('กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบทุกช่อง');
+                return;
+            }
+
             let partStockStr = `${stockVal} ${stockUnit}`;
-            if(stockVal === '0') { partStockStr += ' (Line Stop)'; }
+            if (stockVal === '0') partStockStr += ' (Line Stop)';
+
             const combinedDefect = `[สต๊อกเหลือ: ${partStockStr}] ${rawDefect}`;
-            const reqId = "REQ-2026-" + Math.floor(1000 + Math.random() * 9000);
             const dateStr = requestAt.split('T')[0];
+            const reqId = `REQ-${dateStr.replaceAll('-', '')}-${Math.floor(1000 + Math.random() * 9000)}`;
 
             saveJob({
-                jobId: reqId, requestAt: requestAt, plannedDate: dateStr,
-                sap: sap, dept: dept, dieId: dieId.toUpperCase(),
-                partName: "Auto Part", defect: combinedDefect, partStock: partStockStr, 
-                priority: priority, status: "pending", jobType: jobType,
-                isScheduledForProduction: true, shiftPlannedMinutes: 480
+                jobId: reqId,
+                requestAt,
+                plannedDate: dateStr,
+                sap,
+                dept,
+                dieId: dieId.toUpperCase(),
+                partName,
+                partNumber: partNumber.toUpperCase(),
+                model: model.toUpperCase(),
+                defect: combinedDefect,
+                partStock: partStockStr,
+                priority,
+                status: 'pending',
+                jobType,
+                isScheduledForProduction: true,
+                shiftPlannedMinutes: 480
             });
-            
-            alert(`✅ บันทึกใบแจ้งซ่อมเข้าระบบเรียบร้อย!\nรหัสใบงาน: ${reqId}\nระบบได้แนบสถานะสต๊อก (${partStockStr}) ส่งไปยังคิวงานช่างแล้ว`);
+
+            if (typeof showToast === 'function') showToast(`บันทึกใบงาน ${reqId} เข้าคิวช่างแล้ว`, 'success');
+            else alert(`บันทึกใบแจ้งซ่อมเข้าระบบเรียบร้อย!\nรหัสใบงาน: ${reqId}`);
+
             e.target.reset();
             document.getElementById('requestAt').value = getCurrentDatetimeLocal();
         }
     </script>
+    <script src="app_ui.js"></script>
 </body>
 </html>

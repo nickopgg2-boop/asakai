@@ -56,6 +56,17 @@
                         <div><h4 class="font-bold text-slate-200 text-sm group-hover:text-amber-300 transition-colors">ช่างซ่อมบำรุง (Technician)</h4><p class="text-[10px] text-slate-500 mt-0.5">สิทธิ์รับงาน, บันทึกผลการซ่อม</p></div>
                     </button>
                 </div>
+                <div class="mt-5 p-4 rounded-2xl border border-blue-500/20 bg-blue-500/5">
+                    <label class="block text-[10px] font-bold text-blue-300 uppercase tracking-wider mb-2">Google Sheet API URL (Optional)</label>
+                    <input id="sheetApiUrl" type="url" placeholder="วาง Web app URL จาก Google Apps Script" class="w-full bg-[#0b1120] border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-blue-500">
+                    <div class="flex gap-2 mt-3">
+                        <button onclick="saveSheetApiUrl()" class="flex-1 bg-blue-600/20 border border-blue-500/40 text-blue-300 rounded-xl px-3 py-2 text-xs font-bold hover:bg-blue-600/30 transition-all">บันทึก URL</button>
+                        <button onclick="pullJobsFromSheet()" class="flex-1 bg-slate-800 border border-slate-700 text-slate-300 rounded-xl px-3 py-2 text-xs font-bold hover:bg-slate-700 transition-all">ดึงข้อมูล</button>
+                        <button onclick="pushAllJobsToSheet()" class="flex-1 bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 rounded-xl px-3 py-2 text-xs font-bold hover:bg-emerald-600/30 transition-all">ส่งข้อมูล</button>
+                    </div>
+                    <p class="text-[10px] text-slate-500 mt-2">ถ้าไม่ใส่ URL ระบบยังใช้ localStorage เหมือนเดิม</p>
+                </div>
+
             </div>
             
             <div class="flex items-center justify-between mt-6 pt-6 border-t border-darkborder">
@@ -65,7 +76,20 @@
         </div>
     </div>
 
+    <script src="data_engine.js"></script>
     <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const input = document.getElementById('sheetApiUrl');
+            if (input && typeof getDmsSheetApiUrl === 'function') input.value = getDmsSheetApiUrl();
+        });
+
+        function saveSheetApiUrl() {
+            const url = document.getElementById('sheetApiUrl').value.trim();
+            if (typeof setDmsSheetApiUrl === 'function') setDmsSheetApiUrl(url);
+            if (typeof showToast === 'function') showToast(url ? 'บันทึก Google Sheet API URL แล้ว' : 'ปิดการเชื่อมต่อ Google Sheet แล้ว', 'success');
+            else alert('บันทึกแล้ว');
+        }
+
         function loginAs(role) {
             localStorage.setItem('user_role', role);
             localStorage.setItem('user_name', role === 'executive' ? 'Admin' : (role === 'production' ? 'Suparuk' : 'Orachoon'));
@@ -74,5 +98,6 @@
             else if(role === 'technician') window.location.replace('page_job_queue.html');
         }
     </script>
+    <script src="app_ui.js"></script>
 </body>
 </html>
