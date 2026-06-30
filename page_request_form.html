@@ -161,6 +161,19 @@
                             </div>
                         </div>
                         <div>
+                            <label class="block text-xs font-bold text-slate-400 uppercase mb-2">ไลน์ผลิต (Production Line) <span class="text-rose-500">*</span></label>
+                            <div class="relative">
+                                <select id="productionLine" required class="w-full bg-[#0f172a] text-slate-200 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 appearance-none cursor-pointer">
+                                    <option value="" disabled selected>-- เลือกไลน์ผลิต --</option>
+                                    <option value="LINE A">LINE A</option>
+                                    <option value="LINE B">LINE B</option>
+                                    <option value="LINE C">LINE C</option>
+                                    <option value="LINE D">LINE D</option>
+                                </select>
+                                <i class="fa-solid fa-chevron-down absolute right-4 top-1/2 transform -translate-y-1/2 text-slate-500 pointer-events-none text-xs"></i>
+                            </div>
+                        </div>
+                        <div>
                             <label class="block text-xs font-bold text-slate-400 uppercase mb-2">รหัสแม่พิมพ์ (Die ID) <span class="text-rose-500">*</span></label>
                             <input type="text" id="dieId" required placeholder="เช่น DIE-123" class="w-full bg-[#0f172a] text-slate-200 border border-slate-700 rounded-xl px-4 py-3 text-sm font-mono uppercase outline-none focus:border-blue-500">
                         </div>
@@ -237,6 +250,7 @@
             const sap = document.getElementById('sapRef').value.trim();
             const dept = document.getElementById('dept').value;
             const dieId = document.getElementById('dieId').value.trim();
+            const productionLine = document.getElementById('productionLine').value;
             const partName = document.getElementById('partName').value.trim();
             const partNumber = document.getElementById('partNumber').value.trim();
             const model = document.getElementById('model').value.trim();
@@ -248,7 +262,7 @@
             const stockVal = document.getElementById('stockValue').value;
             const stockUnit = document.getElementById('stockUnit').value;
 
-            if (!sap || !dept || !dieId || !partName || !partNumber || !model || !rawDefect || !priority || !requestAt || stockVal === '') {
+            if (!sap || !dept || !productionLine || !dieId || !partName || !partNumber || !model || !rawDefect || !priority || !requestAt || stockVal === '') {
                 if (typeof showToast === 'function') showToast('กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบทุกช่อง', 'error');
                 else alert('กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบทุกช่อง');
                 return;
@@ -267,6 +281,7 @@
                 plannedDate: dateStr,
                 sap,
                 dept,
+                productionLine,
                 dieId: dieId.toUpperCase(),
                 partName,
                 partNumber: partNumber.toUpperCase(),

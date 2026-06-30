@@ -259,6 +259,7 @@ function normalizeJob(job = {}) {
         partName: job.partName || job.part || job.part_name || 'ไม่ระบุชื่อ Part',
         partNumber: String(job.partNumber || job.partNo || job.part_number || '').toUpperCase(),
         model: String(job.model || job.modelName || '').toUpperCase(),
+        productionLine: String(job.productionLine || job.line || job.lineName || '').toUpperCase(),
         defect: job.defect || job.problemDesc || job.problem || '',
         partStock: job.partStock || '',
         priority: job.priority || 'ปกติ',

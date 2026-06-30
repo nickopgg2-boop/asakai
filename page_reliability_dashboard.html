@@ -95,105 +95,206 @@
         <div class="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
                 <h2 class="text-2xl font-bold text-slate-200 flex items-center gap-2">
-                    <i class="fa-solid fa-gauge-high text-blue-400"></i> สถิติความน่าเชื่อถือและการบำรุงรักษา (Reliability & Maintenance)
+                    <i class="fa-solid fa-gauge-high text-blue-400"></i> Reliability Dashboard
                 </h2>
-                <p class="text-sm text-slate-500 mt-1">วิเคราะห์แนวโน้มประสิทธิภาพของแม่พิมพ์ 15 วันย้อนหลัง (ข้อมูลจริงจาก Engine)</p>
+                <p class="text-sm text-slate-500 mt-1">รูปแบบกราฟอ้างอิง: KPI / LINE STOP / BM / PM และแยกไลน์ผลิต LINE A-D</p>
+                <p class="text-xs text-blue-400 mt-2" id="rangeText">ช่วงข้อมูล: เดือนปัจจุบัน</p>
             </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            <div class="cyber-card p-6">
-                <div class="flex justify-between items-center mb-6 border-b border-darkborder pb-4">
-                    <h3 class="text-sm font-bold text-purple-400 uppercase tracking-wider flex items-center"><i class="fa-solid fa-heart-pulse mr-2"></i> ความทนทาน (MTBF)</h3>
-                    <span class="text-xs font-bold text-slate-400 border border-slate-700 px-3 py-1 rounded-md">หน่วย: นาที</span>
-                </div>
-                <div class="h-64"><canvas id="mtbfChart"></canvas></div>
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
+            <div class="cyber-card p-6 min-h-[380px]">
+                <h3 class="text-center text-xl font-bold text-slate-200 uppercase tracking-wide mb-4">KPI</h3>
+                <div class="h-[300px]"><canvas id="kpiPieChart"></canvas></div>
             </div>
 
-            <div class="cyber-card p-6">
-                <div class="flex justify-between items-center mb-6 border-b border-darkborder pb-4">
-                    <h3 class="text-sm font-bold text-pink-400 uppercase tracking-wider flex items-center"><i class="fa-solid fa-stopwatch mr-2"></i> ความเร็วในการซ่อม (MTTR)</h3>
-                    <span class="text-xs font-bold text-slate-400 border border-slate-700 px-3 py-1 rounded-md">หน่วย: นาที</span>
-                </div>
-                <div class="h-64"><canvas id="mttrChart"></canvas></div>
+            <div class="cyber-card p-6 min-h-[380px]">
+                <h3 class="text-center text-xl font-bold text-slate-200 uppercase tracking-wide mb-4">LINE STOP</h3>
+                <div class="h-[300px]"><canvas id="lineStopChart"></canvas></div>
             </div>
 
-            <div class="cyber-card p-6">
-                <div class="flex justify-between items-center mb-6 border-b border-darkborder pb-4">
-                    <h3 class="text-sm font-bold text-blue-400 uppercase tracking-wider flex items-center"><i class="fa-solid fa-triangle-exclamation mr-2"></i> งานแจ้งซ่อม (BM & PM)</h3>
-                    <span class="text-xs font-bold text-slate-400 border border-slate-700 px-3 py-1 rounded-md">หน่วย: ใบงาน</span>
-                </div>
-                <div class="h-64"><canvas id="bmChart"></canvas></div>
+            <div class="cyber-card p-6 min-h-[380px]">
+                <h3 class="text-center text-xl font-bold text-slate-200 uppercase tracking-wide mb-4">BM</h3>
+                <div class="h-[300px]"><canvas id="bmPartChart"></canvas></div>
             </div>
 
-            <div class="cyber-card p-6">
-                <div class="flex justify-between items-center mb-6 border-b border-darkborder pb-4">
-                    <h3 class="text-sm font-bold text-teal-400 uppercase tracking-wider flex items-center"><i class="fa-solid fa-clock-rotate-left mr-2"></i> เวลารวมการซ่อมบำรุง (Repair Minutes Trend)</h3>
-                    <span class="text-xs font-bold text-slate-400 border border-slate-700 px-3 py-1 rounded-md">หน่วย: นาที</span>
-                </div>
-                <div class="h-64"><canvas id="minsChart"></canvas></div>
+            <div class="cyber-card p-6 min-h-[380px]">
+                <h3 class="text-center text-xl font-bold text-slate-200 uppercase tracking-wide mb-4">PM</h3>
+                <div class="h-[300px]"><canvas id="pmPartChart"></canvas></div>
             </div>
         </div>
     </main>
 
     <script>
-        let mtbfChart, mttrChart, bmChart, minsChart;
+        let kpiPieChart, lineStopChart, bmPartChart, pmPartChart;
 
-        function initCharts() {
-            const gridColor = '#1e293b';
-            const textColor = '#64748b';
-            const fontConfig = { family: 'Prompt', size: 10 };
-            
-            const commonOptions = {
-                responsive: true, maintainAspectRatio: false,
-                scales: {
-                    x: { grid: { display: false }, ticks: { color: textColor, font: fontConfig } },
-                    y: { grid: { color: gridColor, drawBorder: false }, ticks: { color: textColor, font: fontConfig } }
-                },
-                plugins: { legend: { display: false } }
-            };
+        const PRODUCTION_LINES = ['LINE A', 'LINE B', 'LINE C', 'LINE D'];
 
-            const kpis = typeof fetchAndCalculateKPIs === 'function' ? fetchAndCalculateKPIs() : null;
-            if(!kpis) return;
-            const t = kpis.trend;
-
-            mtbfChart = new Chart(document.getElementById('mtbfChart'), {
-                type: 'line',
-                data: { labels: t.labels, datasets: [{ label: 'MTBF (นาที)', data: t.mtbfSeries, borderColor: '#c084fc', backgroundColor: 'rgba(192, 132, 252, 0.2)', borderWidth: 3, fill: true, tension: 0.4 }] },
-                options: commonOptions
-            });
-
-            mttrChart = new Chart(document.getElementById('mttrChart'), {
-                type: 'line',
-                data: { labels: t.labels, datasets: [{ label: 'MTTR (นาที)', data: t.mttrSeries, borderColor: '#f472b6', backgroundColor: 'rgba(244, 114, 182, 0.2)', borderWidth: 3, fill: true, tension: 0.4 }] },
-                options: commonOptions
-            });
-
-            bmChart = new Chart(document.getElementById('bmChart'), {
-                type: 'bar',
-                data: { labels: t.labels, datasets: [
-                    { label: 'BM (ฉุกเฉิน)', data: t.breakdownSeries, backgroundColor: 'rgba(249, 115, 22, 0.8)', borderColor: '#f97316', borderWidth: 1, borderRadius: 2 },
-                    { label: 'PM (ตามรอบ)', data: t.pmSeries, backgroundColor: 'rgba(52, 211, 153, 0.8)', borderColor: '#34d399', borderWidth: 1, borderRadius: 2 }
-                ]},
-                options: { 
-                    ...commonOptions, 
-                    plugins: { legend: { display: true, labels: { color: '#94a3b8', font: { family: 'Prompt' } } } },
-                    scales: { 
-                        x: { stacked: true, grid: { display: false }, ticks: { color: textColor } }, 
-                        y: { stacked: true, grid: { color: gridColor, drawBorder: false }, ticks: { color: textColor } } 
-                    } 
-                }
-            });
-
-            minsChart = new Chart(document.getElementById('minsChart'), {
-                type: 'bar',
-                data: { labels: t.labels, datasets: [{ label: 'Repair Mins', data: t.repairMinutesSeries, backgroundColor: 'rgba(45, 212, 191, 0.8)', borderColor: '#2dd4bf', borderWidth: 1, borderRadius: 2 }] },
-                options: commonOptions
+        function destroyCharts() {
+            [kpiPieChart, lineStopChart, bmPartChart, pmPartChart].forEach(chart => {
+                if (chart) chart.destroy();
             });
         }
 
-        window.addEventListener('DOMContentLoaded', () => { setTimeout(initCharts, 100); });
-        window.addEventListener('dms_jobs_updated', () => { setTimeout(initCharts, 150); });
+        function getCurrentReliabilityRange() {
+            if (typeof getCurrentMonthBounds === 'function') return getCurrentMonthBounds();
+
+            const now = new Date();
+            const start = new Date(now.getFullYear(), now.getMonth(), 1);
+            const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            const fmt = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            return { startDate: fmt(start), endDate: fmt(end) };
+        }
+
+        function getJobDateForReliability(job) {
+            if (typeof getJobDate === 'function') return getJobDate(job);
+            return (job.closedAt || job.endTime || job.plannedDate || job.requestAt || '').slice(0, 10);
+        }
+
+        function getFilteredReliabilityJobs(startDate, endDate) {
+            const jobs = typeof getAllJobs === 'function' ? getAllJobs() : [];
+            return jobs.filter(job => {
+                const dateStr = getJobDateForReliability(job);
+                return typeof isDateInRange === 'function' ? isDateInRange(dateStr, startDate, endDate) : true;
+            });
+        }
+
+        function getLineLabel(job) {
+            const raw = String(job.productionLine || job.line || '').toUpperCase().trim();
+            if (raw === 'A' || raw === 'LINE-A') return 'LINE A';
+            if (raw === 'B' || raw === 'LINE-B') return 'LINE B';
+            if (raw === 'C' || raw === 'LINE-C') return 'LINE C';
+            if (raw === 'D' || raw === 'LINE-D') return 'LINE D';
+            if (PRODUCTION_LINES.includes(raw)) return raw;
+            return 'ไม่ระบุไลน์';
+        }
+
+        function isLineStopJob(job) {
+            const stock = String(job.partStock || '').toLowerCase();
+            const defect = String(job.defect || '').toLowerCase();
+            return stock.includes('line stop') || defect.includes('line stop') || stock.startsWith('0 ') || stock === '0';
+        }
+
+        function getPartLabel(job) {
+            return String(job.partNumber || job.partName || job.dieId || 'PART NUMBER').toUpperCase();
+        }
+
+        function topPartCounts(jobs, jobType) {
+            const counter = new Map();
+            jobs.filter(job => String(job.jobType || '').toUpperCase() === jobType).forEach(job => {
+                const key = getPartLabel(job);
+                counter.set(key, (counter.get(key) || 0) + 1);
+            });
+
+            const rows = [...counter.entries()]
+                .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+                .slice(0, 4);
+
+            while (rows.length < 4) rows.push(['PART NUMBER', 0]);
+            return rows;
+        }
+
+        function barOptions() {
+            const gridColor = '#334155';
+            const textColor = '#cbd5e1';
+            return {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 900, easing: 'easeOutQuart' },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: textColor, font: { family: 'Prompt', size: 11 }, maxRotation: 45, minRotation: 0 }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: gridColor, drawBorder: false },
+                        ticks: { color: textColor, precision: 0, font: { family: 'Prompt', size: 11 } }
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { bodyFont: { family: 'Prompt' }, titleFont: { family: 'Prompt' } }
+                }
+            };
+        }
+
+        function initCharts() {
+            const range = getCurrentReliabilityRange();
+            const jobs = getFilteredReliabilityJobs(range.startDate, range.endDate);
+            const closedJobs = jobs.filter(job => String(job.status || '').toLowerCase() === 'closed');
+            const bmJobs = closedJobs.filter(job => String(job.jobType || '').toUpperCase() === 'BM');
+            const pmJobs = closedJobs.filter(job => String(job.jobType || '').toUpperCase() === 'PM');
+            const kpis = typeof fetchAndCalculateKPIs === 'function' ? fetchAndCalculateKPIs(range.startDate, range.endDate) : null;
+
+            const rangeText = document.getElementById('rangeText');
+            if (rangeText) rangeText.textContent = `ช่วงข้อมูล: ${range.startDate} ถึง ${range.endDate}`;
+
+            destroyCharts();
+
+            const mttr = kpis ? Number(kpis.overall.avgMTTR || 0) : 0;
+            const mtbf = kpis ? Number(kpis.overall.avgMTBF || 0) : 0;
+            const kpiPieData = (mttr + mtbf) > 0 ? [mttr, mtbf] : [0, 0];
+
+            kpiPieChart = new Chart(document.getElementById('kpiPieChart'), {
+                type: 'pie',
+                data: {
+                    labels: ['MTTR', 'MTBF'],
+                    datasets: [{ data: kpiPieData, borderWidth: 0, backgroundColor: ['#4f7df3', '#a78bfa'] }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 900, easing: 'easeOutQuart' },
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#cbd5e1', font: { family: 'Prompt', size: 12 } } },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => {
+                                    const total = ctx.dataset.data.reduce((s, v) => s + Number(v || 0), 0);
+                                    const value = Number(ctx.raw || 0);
+                                    const pct = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
+                                    return `${ctx.label}: ${value} นาที (${pct}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            const lineStopCounts = PRODUCTION_LINES.map(line => jobs.filter(job => getLineLabel(job) === line && isLineStopJob(job)).length);
+            lineStopChart = new Chart(document.getElementById('lineStopChart'), {
+                type: 'bar',
+                data: {
+                    labels: ['line A', 'LINE B', 'LINE C', 'LINE D'],
+                    datasets: [{ label: 'Line stop', data: lineStopCounts, backgroundColor: '#4f7df3', borderRadius: 10, maxBarThickness: 70 }]
+                },
+                options: barOptions()
+            });
+
+            const bmRows = topPartCounts(bmJobs, 'BM');
+            bmPartChart = new Chart(document.getElementById('bmPartChart'), {
+                type: 'bar',
+                data: {
+                    labels: bmRows.map(row => row[0]),
+                    datasets: [{ label: 'BM', data: bmRows.map(row => row[1]), backgroundColor: '#4f7df3', borderRadius: 10, maxBarThickness: 70 }]
+                },
+                options: barOptions()
+            });
+
+            const pmRows = topPartCounts(pmJobs, 'PM');
+            pmPartChart = new Chart(document.getElementById('pmPartChart'), {
+                type: 'bar',
+                data: {
+                    labels: pmRows.map(row => row[0]),
+                    datasets: [{ label: 'PM', data: pmRows.map(row => row[1]), backgroundColor: '#4f7df3', borderRadius: 10, maxBarThickness: 70 }]
+                },
+                options: barOptions()
+            });
+        }
+
+        window.addEventListener('DOMContentLoaded', () => { setTimeout(initCharts, 150); });
+        window.addEventListener('dms_jobs_updated', () => { setTimeout(initCharts, 200); });
     </script>
     <script src="app_ui.js"></script>
 </body>
