@@ -81,6 +81,27 @@ function parseBoolean(value, fallback = true) {
     return fallback;
 }
 
+function normalizeRepairSiteType(value, jobType = 'BM') {
+    const raw = String(value || '').trim().toLowerCase().replace(/\s+/g, '_').replace(/-/g, '_');
+
+    if (['on_site', 'onsite', 'line', 'line_stop', 'front_machine', 'machine', 'หน้าเครื่อง', 'ซ่อมหน้าเครื่อง'].includes(raw)) {
+        return 'on_site';
+    }
+
+    if (['no_site', 'nosite', 'off_site', 'offline', 'in_shop', 'workshop', 'department', 'แผนก', 'ซ่อมในแผนก'].includes(raw)) {
+        return 'no_site';
+    }
+
+    // Backward compatibility: old BM jobs had no repairSiteType. Treat them as On Site so existing KPI data still appears.
+    return String(jobType || '').toUpperCase() === 'BM' ? 'on_site' : 'not_applicable';
+}
+
+function getRepairSiteLabel(repairSiteType) {
+    if (repairSiteType === 'on_site') return 'BM On Site';
+    if (repairSiteType === 'no_site') return 'BM No Site';
+    return '-';
+}
+
 function parseDateTimeValue(value) {
     if (!value) return null;
     if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
@@ -248,6 +269,7 @@ function normalizeJob(job = {}) {
     const rawStatus = String(job.status || 'pending').trim().toLowerCase();
     const status = rawStatus === 'done' ? 'closed' : rawStatus;
     const jobType = String(job.jobType || (job.dept === 'PM' ? 'PM' : 'BM')).toUpperCase();
+    const repairSiteType = normalizeRepairSiteType(job.repairSiteType || job.siteType || job.bmSiteType || job.repairLocation, jobType);
 
     const normalized = {
         jobId: String(job.jobId || job.id || `REQ-${Date.now()}`),
@@ -271,6 +293,7 @@ function normalizeJob(job = {}) {
         rootCause: job.rootCause || job.repairDetail || null,
         downtimeMinutes: parseNumber(job.downtimeMinutes, null),
         jobType,
+        repairSiteType,
         closedBy: job.closedBy || null,
         closedAt,
         isScheduledForProduction: parseBoolean(job.isScheduledForProduction, true),
@@ -564,6 +587,34 @@ function fetchAndCalculateKPIs(startDate = null, endDate = null) {
         trend,
         topBadActors
     };
+}
+
+function isClosedBmOnSite(job) {
+    return job && job.status === 'closed' && job.jobType === 'BM' && normalizeRepairSiteType(job.repairSiteType, job.jobType) === 'on_site';
+}
+
+function isClosedBmNoSite(job) {
+    return job && job.status === 'closed' && job.jobType === 'BM' && normalizeRepairSiteType(job.repairSiteType, job.jobType) === 'no_site';
+}
+
+function getKpiAnalysisJobs(startDate = null, endDate = null, options = {}) {
+    const mode = options.mode || 'bm_on_site';
+    const line = String(options.productionLine || options.line || '').toUpperCase();
+    const dept = String(options.dept || '').toUpperCase();
+
+    return getAllJobs().filter(job => {
+        if ((startDate || endDate) && !isDateInRange(getJobDate(job), startDate, endDate)) return false;
+        if (line && job.productionLine !== line) return false;
+        if (dept && job.dept !== dept) return false;
+
+        if (mode === 'bm_on_site') return isClosedBmOnSite(job);
+        if (mode === 'bm_no_site') return isClosedBmNoSite(job);
+        if (mode === 'bm_all') return job.status === 'closed' && job.jobType === 'BM';
+        if (mode === 'pm') return job.status === 'closed' && job.jobType === 'PM';
+        if (mode === 'all_closed') return job.status === 'closed';
+
+        return isClosedBmOnSite(job);
+    });
 }
 
 function getDieMasterData(startDate = null, endDate = null) {

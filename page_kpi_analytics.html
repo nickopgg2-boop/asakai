@@ -97,105 +97,373 @@
     </header>
 
     <main class="flex-1 p-4 lg:p-8 space-y-6 max-w-[1800px] mx-auto w-full">
-        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+        <div class="flex flex-col 2xl:flex-row justify-between items-start 2xl:items-center gap-4 mb-2">
             <div>
                 <h2 class="text-2xl font-bold text-slate-200 flex items-center gap-2">
-                    <i class="fa-solid fa-square-poll-vertical text-blue-400"></i> วิเคราะห์ดัชนีชี้วัดโรงงาน (KPI Deep-Dive)
+                    <i class="fa-solid fa-square-poll-vertical text-blue-400"></i> วิเคราะห์ KPI ซ่อมบำรุงรายวัน
                 </h2>
-                <p class="text-sm text-slate-500 mt-1">ข้อมูลถูกประมวลผลจากเวลาเริ่ม-จบงานซ่อมบำรุงจริง (Real Data)</p>
+                <p class="text-sm text-slate-500 mt-1">MTTR / MTBF ตั้งค่าเริ่มต้นให้นับเฉพาะ BM On Site หรือซ่อมหน้าเครื่องเท่านั้น</p>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2 bg-[#0f172a] p-2 rounded-2xl border border-darkborder">
+                <input type="date" id="filterStart" class="bg-darkcard text-slate-200 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono outline-none focus:border-blue-500">
+                <span class="text-slate-500">-</span>
+                <input type="date" id="filterEnd" class="bg-darkcard text-slate-200 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono outline-none focus:border-blue-500">
+                <select id="filterLine" class="bg-darkcard text-slate-200 border border-slate-700 rounded-xl px-3 py-2 text-xs outline-none focus:border-blue-500">
+                    <option value="">ทุกไลน์</option>
+                    <option value="LINE A">LINE A</option>
+                    <option value="LINE B">LINE B</option>
+                    <option value="LINE C">LINE C</option>
+                    <option value="LINE D">LINE D</option>
+                </select>
+                <select id="filterDept" class="bg-darkcard text-slate-200 border border-slate-700 rounded-xl px-3 py-2 text-xs outline-none focus:border-blue-500">
+                    <option value="">ทุกแผนก</option>
+                    <option value="S-D">S-D</option>
+                    <option value="L-D">L-D</option>
+                    <option value="P-D">P-D</option>
+                </select>
+                <select id="filterMode" class="bg-darkcard text-slate-200 border border-slate-700 rounded-xl px-3 py-2 text-xs outline-none focus:border-blue-500">
+                    <option value="bm_on_site">BM On Site / KPI หน้าเครื่อง</option>
+                    <option value="bm_no_site">BM No Site / ซ่อมในแผนก</option>
+                    <option value="bm_all">BM ทั้งหมด</option>
+                    <option value="pm">PM</option>
+                    <option value="all_closed">งานปิดทั้งหมด</option>
+                </select>
+                <button onclick="applyFilters()" class="bg-blue-600/20 border border-blue-500/50 text-blue-400 hover:bg-blue-500/30 px-4 py-2 rounded-xl text-xs font-bold transition-all">ค้นหา</button>
+                <button onclick="resetFilters()" class="bg-slate-800 border border-slate-700 text-slate-400 hover:text-slate-200 hover:bg-slate-700 px-3 py-2 rounded-xl text-xs font-bold transition-all"><i class="fa-solid fa-rotate-left"></i></button>
+                <button onclick="exportKpiCsv()" class="bg-emerald-600/20 border border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/30 px-4 py-2 rounded-xl text-xs font-bold transition-all"><i class="fa-solid fa-file-csv mr-1"></i>Export</button>
             </div>
         </div>
-        
-        <div class="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8">
-            <div class="cyber-card p-6">
-                <div class="flex justify-between items-center mb-6 border-b border-darkborder pb-4">
-                    <h3 class="text-sm font-bold text-rose-400 uppercase tracking-wider flex items-center"><i class="fa-solid fa-circle-exclamation mr-2"></i>TOP 5 BAD ACTORS (LOWEST EST. MTBF)</h3>
-                    <span class="text-xs font-bold text-slate-400 border border-slate-700 px-3 py-1 rounded-md">หน่วย: นาที</span>
+
+        <div class="bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-2xl px-4 py-3 text-xs leading-6">
+            <i class="fa-solid fa-triangle-exclamation mr-1"></i>
+            หมายเหตุ: KPI หน้าเครื่องให้ใช้เฉพาะ <b>BM On Site</b> เท่านั้น ส่วน BM No Site ใช้ดูภาระงานซ่อมในแผนก ไม่ควรนำไปปนกับ MTTR / MTBF หน้าเครื่อง
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-4">
+            <div class="cyber-card p-4"><p class="text-[10px] text-sky-400 font-bold uppercase mb-2">MTTR</p><h3 id="cardMttr" class="text-3xl font-bold font-mono text-sky-400">0</h3><p class="text-[10px] text-slate-500 mt-1">นาที/งาน</p></div>
+            <div class="cyber-card p-4"><p class="text-[10px] text-purple-400 font-bold uppercase mb-2">MTBF</p><h3 id="cardMtbf" class="text-3xl font-bold font-mono text-purple-400">0</h3><p class="text-[10px] text-slate-500 mt-1">นาที/ครั้ง</p></div>
+            <div class="cyber-card p-4"><p class="text-[10px] text-rose-400 font-bold uppercase mb-2">Downtime</p><h3 id="cardDowntime" class="text-3xl font-bold font-mono text-rose-400">0</h3><p class="text-[10px] text-slate-500 mt-1">นาทีรวม</p></div>
+            <div class="cyber-card p-4"><p class="text-[10px] text-amber-400 font-bold uppercase mb-2">Line Stop</p><h3 id="cardLineStop" class="text-3xl font-bold font-mono text-amber-400">0</h3><p class="text-[10px] text-slate-500 mt-1">BM On Site</p></div>
+            <div class="cyber-card p-4"><p class="text-[10px] text-blue-400 font-bold uppercase mb-2">BM On Site</p><h3 id="cardBmOn" class="text-3xl font-bold font-mono text-blue-400">0</h3><p class="text-[10px] text-slate-500 mt-1">งานปิด</p></div>
+            <div class="cyber-card p-4"><p class="text-[10px] text-orange-400 font-bold uppercase mb-2">BM No Site</p><h3 id="cardBmNo" class="text-3xl font-bold font-mono text-orange-400">0</h3><p class="text-[10px] text-slate-500 mt-1">งานปิด</p></div>
+            <div class="cyber-card p-4"><p class="text-[10px] text-emerald-400 font-bold uppercase mb-2">PM</p><h3 id="cardPm" class="text-3xl font-bold font-mono text-emerald-400">0</h3><p class="text-[10px] text-slate-500 mt-1">งานปิด</p></div>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <div class="cyber-card p-6 xl:col-span-2">
+                <div class="flex justify-between items-center mb-5 border-b border-darkborder pb-4">
+                    <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider"><i class="fa-solid fa-chart-line mr-2 text-blue-400"></i>Daily MTTR / MTBF Trend</h3>
+                    <span id="trendRangeLabel" class="text-xs text-slate-500"></span>
                 </div>
-                <div class="h-80"><canvas id="badActorChart"></canvas></div>
+                <div class="h-80"><canvas id="trendChart"></canvas></div>
             </div>
-            
+
             <div class="cyber-card p-6">
-                <div class="flex justify-between items-center mb-6 border-b border-darkborder pb-4">
-                    <h3 class="text-sm font-bold text-blue-400 uppercase tracking-wider flex items-center"><i class="fa-solid fa-stopwatch mr-2"></i>AVG MTTR BY DEPT</h3>
-                    <span class="text-xs font-bold text-slate-400 border border-slate-700 px-3 py-1 rounded-md">หน่วย: นาที</span>
+                <div class="flex justify-between items-center mb-5 border-b border-darkborder pb-4">
+                    <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider"><i class="fa-solid fa-road-barrier mr-2 text-rose-400"></i>Downtime by Line</h3>
+                    <span class="text-xs text-slate-500">นาที</span>
                 </div>
-                <div class="h-80"><canvas id="deptMttrChart"></canvas></div>
+                <div class="h-72"><canvas id="downtimeLineChart"></canvas></div>
+            </div>
+
+            <div class="cyber-card p-6">
+                <div class="flex justify-between items-center mb-5 border-b border-darkborder pb-4">
+                    <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider"><i class="fa-solid fa-bolt mr-2 text-amber-400"></i>Breakdown Count by Line</h3>
+                    <span class="text-xs text-slate-500">ครั้ง</span>
+                </div>
+                <div class="h-72"><canvas id="breakdownLineChart"></canvas></div>
+            </div>
+
+            <div class="cyber-card p-6">
+                <div class="flex justify-between items-center mb-5 border-b border-darkborder pb-4">
+                    <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider"><i class="fa-solid fa-ranking-star mr-2 text-blue-400"></i>Top Part Number</h3>
+                    <span class="text-xs text-slate-500">เรียงตามจำนวนเสีย</span>
+                </div>
+                <div class="h-80"><canvas id="topPartChart"></canvas></div>
+            </div>
+
+            <div class="cyber-card p-6">
+                <div class="flex justify-between items-center mb-5 border-b border-darkborder pb-4">
+                    <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider"><i class="fa-solid fa-screwdriver-wrench mr-2 text-purple-400"></i>Top Problem / Root Cause</h3>
+                    <span class="text-xs text-slate-500">เรียงตามจำนวนครั้ง</span>
+                </div>
+                <div class="h-80"><canvas id="topProblemChart"></canvas></div>
+            </div>
+        </div>
+
+        <div class="cyber-card p-6">
+            <div class="flex justify-between items-center mb-4 border-b border-darkborder pb-4">
+                <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider"><i class="fa-solid fa-table-list mr-2 text-emerald-400"></i>รายการใบงานที่นำมาคิด KPI</h3>
+                <span id="sourceCountLabel" class="text-xs text-slate-500"></span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="text-xs text-slate-500 uppercase border-b border-darkborder">
+                        <tr>
+                            <th class="text-left py-3 px-3">Job ID</th>
+                            <th class="text-left py-3 px-3">Date</th>
+                            <th class="text-left py-3 px-3">Line</th>
+                            <th class="text-left py-3 px-3">Dept</th>
+                            <th class="text-left py-3 px-3">Part Number</th>
+                            <th class="text-left py-3 px-3">Type</th>
+                            <th class="text-right py-3 px-3">Downtime</th>
+                            <th class="text-left py-3 px-3">Problem</th>
+                        </tr>
+                    </thead>
+                    <tbody id="kpiSourceTable" class="divide-y divide-darkborder"></tbody>
+                </table>
             </div>
         </div>
     </main>
     
     <script>
         Chart.register(ChartDataLabels);
-        let badActorChart, deptMttrChart;
+        let trendChart, downtimeLineChart, breakdownLineChart, topPartChart, topProblemChart;
+        let latestSourceJobs = [];
 
-        function initCharts() {
-            const gridColor = '#1e293b';
-            const textColor = '#64748b';
-            const labelColor = '#ffffff';
-            const fontConfig = { family: 'Prompt', size: 11 };
+        function getRepairSiteText(job) {
+            if (typeof getRepairSiteLabel === 'function') return getRepairSiteLabel(job.repairSiteType);
+            return job.repairSiteType === 'no_site' ? 'BM No Site' : 'BM On Site';
+        }
 
-            const kpis = typeof fetchAndCalculateKPIs === 'function' ? fetchAndCalculateKPIs() : null;
-            if(!kpis) return;
-            
-            const badActors = kpis.topBadActors;
-            
-            // สร้างกราฟแท่งแนวตั้ง (Bar Chart) - สีแดง
-            badActorChart = new Chart(document.getElementById('badActorChart'), {
-                type: 'bar',
-                data: { 
-                    labels: badActors.map(b => b.dieId), 
-                    datasets: [{ 
-                        label: 'Est. MTBF (Mins)', 
-                        data: badActors.map(b => b.mtbfEstimate), 
-                        backgroundColor: '#f43f5e', 
-                        borderRadius: 2 
-                    }]
-                },
-                options: { 
-                    responsive: true, maintainAspectRatio: false,
-                    scales: {
-                        x: { grid: { display: false }, ticks: { color: textColor, font: fontConfig } },
-                        y: { grid: { color: gridColor, drawBorder: false }, ticks: { color: textColor, font: fontConfig } }
-                    },
-                    plugins: { 
-                        legend: { display: false }, 
-                        datalabels: { display: true, color: labelColor, anchor: 'end', align: 'top', font: { weight: 'bold', size: 12 } } 
-                    }
-                }
+        function n(value) {
+            return typeof parseNumber === 'function' ? parseNumber(value, 0) : (Number(value) || 0);
+        }
+
+        function cleanProblem(text) {
+            const cleaned = String(text || '').replace(/^\[สต๊อกเหลือ:.*?\]\s*/i, '').trim();
+            return cleaned || 'ไม่ระบุปัญหา';
+        }
+
+        function getSelectedFilters() {
+            return {
+                startDate: document.getElementById('filterStart').value,
+                endDate: document.getElementById('filterEnd').value,
+                line: document.getElementById('filterLine').value,
+                dept: document.getElementById('filterDept').value,
+                mode: document.getElementById('filterMode').value
+            };
+        }
+
+        function matchBaseFilters(job, filters) {
+            if ((filters.startDate || filters.endDate) && !isDateInRange(getJobDate(job), filters.startDate, filters.endDate)) return false;
+            if (filters.line && job.productionLine !== filters.line) return false;
+            if (filters.dept && job.dept !== filters.dept) return false;
+            return true;
+        }
+
+        function matchMode(job, mode) {
+            const site = typeof normalizeRepairSiteType === 'function' ? normalizeRepairSiteType(job.repairSiteType, job.jobType) : (job.repairSiteType || 'on_site');
+            if (mode === 'bm_on_site') return job.status === 'closed' && job.jobType === 'BM' && site === 'on_site';
+            if (mode === 'bm_no_site') return job.status === 'closed' && job.jobType === 'BM' && site === 'no_site';
+            if (mode === 'bm_all') return job.status === 'closed' && job.jobType === 'BM';
+            if (mode === 'pm') return job.status === 'closed' && job.jobType === 'PM';
+            if (mode === 'all_closed') return job.status === 'closed';
+            return job.status === 'closed' && job.jobType === 'BM' && site === 'on_site';
+        }
+
+        function getDateRangeForChart(filters) {
+            if (typeof getTrendDates === 'function') return getTrendDates(filters.startDate, filters.endDate);
+            if (filters.startDate && filters.endDate) return [filters.startDate, filters.endDate];
+            return [];
+        }
+
+        function groupBy(rows, keyFn) {
+            const map = new Map();
+            rows.forEach(row => {
+                const key = keyFn(row) || 'ไม่ระบุ';
+                if (!map.has(key)) map.set(key, { key, count: 0, downtime: 0 });
+                const item = map.get(key);
+                item.count += 1;
+                item.downtime += n(row.downtimeMinutes);
             });
+            return [...map.values()];
+        }
 
-            const depts = Object.keys(kpis.byDept);
-            const deptMttr = depts.map(d => kpis.byDept[d].mttr);
-            
-            // สร้างกราฟแท่งแนวตั้ง (Bar Chart) - สีน้ำเงิน
-            deptMttrChart = new Chart(document.getElementById('deptMttrChart'), {
+        function destroyCharts() {
+            [trendChart, downtimeLineChart, breakdownLineChart, topPartChart, topProblemChart].forEach(chart => {
+                if (chart) chart.destroy();
+            });
+        }
+
+        function makeBarChart(canvasId, labels, values, label, horizontal = false) {
+            const ctx = document.getElementById(canvasId);
+            return new Chart(ctx, {
                 type: 'bar',
-                data: { 
-                    labels: depts, 
-                    datasets: [{ 
-                        label: 'MTTR (Mins)', 
-                        data: deptMttr, 
-                        backgroundColor: '#3b82f6', 
-                        borderRadius: 2 
-                    }]
-                },
-                options: { 
-                    responsive: true, maintainAspectRatio: false,
+                data: { labels, datasets: [{ label, data: values, borderRadius: 3 }] },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: horizontal ? 'y' : 'x',
                     scales: {
-                        x: { grid: { display: false }, ticks: { color: textColor, font: fontConfig } },
-                        y: { grid: { color: gridColor, drawBorder: false }, ticks: { color: textColor, font: fontConfig } }
+                        x: { grid: { color: horizontal ? '#1e293b' : 'transparent' }, ticks: { color: '#64748b', font: { family: 'Prompt' } } },
+                        y: { grid: { color: horizontal ? 'transparent' : '#1e293b' }, ticks: { color: '#64748b', font: { family: 'Prompt' } } }
                     },
-                    plugins: { 
-                        legend: { display: false }, 
-                        datalabels: { display: true, color: labelColor, anchor: 'end', align: 'top', font: { weight: 'bold', size: 12 } } 
+                    plugins: {
+                        legend: { display: false },
+                        datalabels: { color: '#fff', anchor: 'end', align: horizontal ? 'right' : 'top', formatter: v => v > 0 ? v : '' }
                     }
                 }
             });
         }
 
-        window.addEventListener('DOMContentLoaded', () => { setTimeout(initCharts, 200); });
-        window.addEventListener('dms_jobs_updated', () => { setTimeout(initCharts, 150); });
+        function renderKpiAnalytics() {
+            const filters = getSelectedFilters();
+            const allJobs = getAllJobs();
+            const baseJobs = allJobs.filter(job => matchBaseFilters(job, filters));
+            const closedJobs = baseJobs.filter(job => job.status === 'closed');
+            const bmOnSiteJobs = closedJobs.filter(job => job.jobType === 'BM' && (typeof normalizeRepairSiteType === 'function' ? normalizeRepairSiteType(job.repairSiteType, job.jobType) : job.repairSiteType) === 'on_site');
+            const bmNoSiteJobs = closedJobs.filter(job => job.jobType === 'BM' && (typeof normalizeRepairSiteType === 'function' ? normalizeRepairSiteType(job.repairSiteType, job.jobType) : job.repairSiteType) === 'no_site');
+            const pmJobs = closedJobs.filter(job => job.jobType === 'PM');
+            const sourceJobs = baseJobs.filter(job => matchMode(job, filters.mode));
+            latestSourceJobs = sourceJobs;
+
+            const totalDowntime = sourceJobs.reduce((sum, job) => sum + n(job.downtimeMinutes), 0);
+            const sourceCount = sourceJobs.length;
+            const mttr = sourceCount ? Math.round(totalDowntime / sourceCount) : 0;
+            const shiftMinutes = baseJobs.reduce((max, job) => Math.max(max, n(job.shiftPlannedMinutes) || 480), 480);
+            const activeLines = new Set(sourceJobs.map(j => j.productionLine).filter(Boolean));
+            const runningMinutes = Math.max((shiftMinutes * Math.max(activeLines.size, 1)) - totalDowntime, 0);
+            const mtbf = sourceCount && filters.mode !== 'pm' && filters.mode !== 'all_closed' ? Math.round(runningMinutes / sourceCount) : 0;
+
+            document.getElementById('cardMttr').innerText = mttr;
+            document.getElementById('cardMtbf').innerText = mtbf;
+            document.getElementById('cardDowntime').innerText = totalDowntime;
+            document.getElementById('cardLineStop').innerText = bmOnSiteJobs.length;
+            document.getElementById('cardBmOn').innerText = bmOnSiteJobs.length;
+            document.getElementById('cardBmNo').innerText = bmNoSiteJobs.length;
+            document.getElementById('cardPm').innerText = pmJobs.length;
+            document.getElementById('sourceCountLabel').innerText = `${sourceJobs.length} รายการ`;
+            document.getElementById('trendRangeLabel').innerText = filters.startDate && filters.endDate ? `${filters.startDate} ถึง ${filters.endDate}` : 'เดือนปัจจุบัน';
+
+            const dates = getDateRangeForChart(filters);
+            const labels = dates.map(d => d ? d.slice(5) : '');
+            const dailyMttr = [];
+            const dailyMtbf = [];
+
+            dates.forEach(dateStr => {
+                const daySource = sourceJobs.filter(job => getJobDate(job) === dateStr);
+                const dayBase = baseJobs.filter(job => getJobDate(job) === dateStr);
+                const dayDowntime = daySource.reduce((sum, job) => sum + n(job.downtimeMinutes), 0);
+                const count = daySource.length;
+                dailyMttr.push(count ? Math.round(dayDowntime / count) : 0);
+
+                const dayLines = new Set(daySource.map(j => j.productionLine).filter(Boolean));
+                const dayShift = dayBase.reduce((max, job) => Math.max(max, n(job.shiftPlannedMinutes) || 480), 480);
+                const dayRun = Math.max((dayShift * Math.max(dayLines.size, 1)) - dayDowntime, 0);
+                dailyMtbf.push(count && filters.mode !== 'pm' && filters.mode !== 'all_closed' ? Math.round(dayRun / count) : 0);
+            });
+
+            destroyCharts();
+
+            trendChart = new Chart(document.getElementById('trendChart'), {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        { label: 'MTTR', data: dailyMttr, tension: 0.35, borderWidth: 2, pointRadius: 3 },
+                        { label: 'MTBF', data: dailyMtbf, tension: 0.35, borderWidth: 2, pointRadius: 3 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: '#64748b', font: { family: 'Prompt' } } },
+                        y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: 'Prompt' } } }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#94a3b8', font: { family: 'Prompt' } } },
+                        datalabels: { display: false }
+                    }
+                }
+            });
+
+            const standardLines = ['LINE A', 'LINE B', 'LINE C', 'LINE D'];
+            const byLine = standardLines.map(line => {
+                const rows = sourceJobs.filter(job => job.productionLine === line);
+                return { line, count: rows.length, downtime: rows.reduce((sum, job) => sum + n(job.downtimeMinutes), 0) };
+            });
+            downtimeLineChart = makeBarChart('downtimeLineChart', byLine.map(x => x.line), byLine.map(x => x.downtime), 'Downtime');
+            breakdownLineChart = makeBarChart('breakdownLineChart', byLine.map(x => x.line), byLine.map(x => x.count), 'Count');
+
+            const topParts = groupBy(sourceJobs, job => job.partNumber || job.dieId || job.partName).sort((a, b) => b.count - a.count || b.downtime - a.downtime).slice(0, 10);
+            topPartChart = makeBarChart('topPartChart', topParts.map(x => x.key), topParts.map(x => x.count), 'Count', true);
+
+            const topProblems = groupBy(sourceJobs, job => cleanProblem(job.defect || job.rootCause || job.repairMethod)).sort((a, b) => b.count - a.count || b.downtime - a.downtime).slice(0, 10);
+            topProblemChart = makeBarChart('topProblemChart', topProblems.map(x => x.key.length > 28 ? x.key.slice(0, 28) + '...' : x.key), topProblems.map(x => x.count), 'Count', true);
+
+            renderSourceTable(sourceJobs);
+        }
+
+        function renderSourceTable(rows) {
+            const tbody = document.getElementById('kpiSourceTable');
+            if (!rows.length) {
+                tbody.innerHTML = `<tr><td colspan="8" class="py-8 text-center text-slate-500">ไม่มีข้อมูลตามเงื่อนไขที่เลือก</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = rows.slice(0, 80).map(job => `
+                <tr class="hover:bg-slate-800/30 transition-colors">
+                    <td class="py-3 px-3 font-mono text-blue-300">${job.jobId}</td>
+                    <td class="py-3 px-3 font-mono text-slate-400">${getJobDate(job) || '-'}</td>
+                    <td class="py-3 px-3">${job.productionLine || '-'}</td>
+                    <td class="py-3 px-3">${job.dept || '-'}</td>
+                    <td class="py-3 px-3 font-mono">${job.partNumber || '-'}</td>
+                    <td class="py-3 px-3">${job.jobType === 'BM' ? getRepairSiteText(job) : 'PM'}</td>
+                    <td class="py-3 px-3 text-right font-mono text-rose-300">${n(job.downtimeMinutes)}</td>
+                    <td class="py-3 px-3 text-slate-400 max-w-[360px] truncate">${cleanProblem(job.defect || job.rootCause || job.repairMethod)}</td>
+                </tr>
+            `).join('');
+        }
+
+        function applyFilters() {
+            renderKpiAnalytics();
+        }
+
+        function resetFilters() {
+            const bounds = getCurrentMonthBounds();
+            document.getElementById('filterStart').value = bounds.startDate;
+            document.getElementById('filterEnd').value = bounds.endDate;
+            document.getElementById('filterLine').value = '';
+            document.getElementById('filterDept').value = '';
+            document.getElementById('filterMode').value = 'bm_on_site';
+            renderKpiAnalytics();
+        }
+
+        function exportKpiCsv() {
+            const headers = ['jobId','date','productionLine','dept','partNumber','jobType','repairSiteType','downtimeMinutes','problem'];
+            const lines = [headers.join(',')].concat(latestSourceJobs.map(job => {
+                const values = [
+                    job.jobId,
+                    getJobDate(job) || '',
+                    job.productionLine || '',
+                    job.dept || '',
+                    job.partNumber || '',
+                    job.jobType || '',
+                    job.repairSiteType || '',
+                    n(job.downtimeMinutes),
+                    cleanProblem(job.defect || job.rootCause || job.repairMethod)
+                ];
+                return values.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
+            }));
+
+            const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `kpi_analytics_${new Date().toISOString().slice(0,10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(resetFilters, 250);
+        });
+        window.addEventListener('dms_jobs_updated', () => {
+            setTimeout(renderKpiAnalytics, 150);
+        });
     </script>
     <script src="app_ui.js"></script>
 </body>

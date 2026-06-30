@@ -124,12 +124,23 @@
                         <div>
                             <label class="block text-xs font-bold text-slate-400 uppercase mb-2">ประเภทงาน (Job Type) <span class="text-rose-500">*</span></label>
                             <div class="relative">
-                                <select id="jobType" required class="w-full bg-[#0f172a] text-slate-200 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 appearance-none cursor-pointer">
+                                <select id="jobType" required onchange="toggleRepairSiteType()" class="w-full bg-[#0f172a] text-slate-200 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 appearance-none cursor-pointer">
                                     <option value="BM">แจ้งซ่อมฉุกเฉิน (BM)</option>
                                     <option value="PM">ส่งบำรุงรักษาตามรอบ (PM)</option>
                                 </select>
                                 <i class="fa-solid fa-chevron-down absolute right-4 top-1/2 transform -translate-y-1/2 text-slate-500 pointer-events-none text-xs"></i>
                             </div>
+                        </div>
+                        <div id="repairSiteTypeBlock">
+                            <label class="block text-xs font-bold text-slate-400 uppercase mb-2">ประเภท BM <span class="text-rose-500">*</span></label>
+                            <div class="relative">
+                                <select id="repairSiteType" class="w-full bg-[#0f172a] text-slate-200 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 appearance-none cursor-pointer">
+                                    <option value="on_site" selected>BM On Site / ซ่อมหน้าเครื่อง</option>
+                                    <option value="no_site">BM No Site / ซ่อมในแผนก</option>
+                                </select>
+                                <i class="fa-solid fa-chevron-down absolute right-4 top-1/2 transform -translate-y-1/2 text-slate-500 pointer-events-none text-xs"></i>
+                            </div>
+                            <p class="text-[10px] text-slate-500 mt-1.5 ml-1">MTTR / MTBF รายวันจะนับเฉพาะ BM On Site เท่านั้น</p>
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-slate-400 uppercase mb-2">รหัสใบแจ้งซ่อม SAP <span class="text-rose-500">*</span></label>
@@ -245,6 +256,25 @@
     </main>
 
     <script>
+        function toggleRepairSiteType() {
+            const jobType = document.getElementById('jobType').value;
+            const block = document.getElementById('repairSiteTypeBlock');
+            const input = document.getElementById('repairSiteType');
+
+            if (jobType === 'BM') {
+                block.classList.remove('hidden');
+                input.disabled = false;
+            } else {
+                block.classList.add('hidden');
+                input.disabled = true;
+                input.value = 'on_site';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            toggleRepairSiteType();
+        });
+
         function submitForm(e) {
             e.preventDefault();
             const sap = document.getElementById('sapRef').value.trim();
@@ -258,6 +288,7 @@
             const priorityInput = document.querySelector('input[name="priority"]:checked');
             const priority = priorityInput ? priorityInput.value : '';
             const jobType = document.getElementById('jobType').value;
+            const repairSiteType = jobType === 'BM' ? document.getElementById('repairSiteType').value : 'not_applicable';
             const requestAt = document.getElementById('requestAt').value;
             const stockVal = document.getElementById('stockValue').value;
             const stockUnit = document.getElementById('stockUnit').value;
@@ -291,6 +322,7 @@
                 priority,
                 status: 'pending',
                 jobType,
+                repairSiteType,
                 isScheduledForProduction: true,
                 shiftPlannedMinutes: 480
             });
