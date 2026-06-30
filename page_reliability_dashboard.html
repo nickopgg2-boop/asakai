@@ -56,6 +56,28 @@
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
         .cyber-card { background-color: #151f32; border: 1px solid #1e293b; border-radius: 1rem; }
+        .period-btn {
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid #1e293b;
+            color: #94a3b8;
+            padding: 0.65rem 1rem;
+            border-radius: 0.9rem;
+            font-size: 0.8rem;
+            font-weight: 700;
+            transition: all 0.22s ease;
+        }
+        .period-btn:hover {
+            color: #e2e8f0;
+            border-color: rgba(59, 130, 246, 0.45);
+            background: rgba(30, 41, 59, 0.8);
+            transform: translateY(-1px);
+        }
+        .period-btn.active {
+            color: #60a5fa;
+            border-color: rgba(59, 130, 246, 0.65);
+            background: rgba(37, 99, 235, 0.16);
+            box-shadow: 0 0 16px rgba(59, 130, 246, 0.2);
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col font-prompt selection:bg-blue-500/30">
@@ -100,6 +122,11 @@
                 <p class="text-sm text-slate-500 mt-1">รูปแบบกราฟอ้างอิง: KPI / LINE STOP / BM / PM และแยกไลน์ผลิต LINE A-D</p>
                 <p class="text-xs text-blue-400 mt-2" id="rangeText">ช่วงข้อมูล: เดือนปัจจุบัน</p>
             </div>
+            <div class="flex flex-wrap items-center gap-2 bg-[#0f172a] border border-darkborder rounded-2xl p-2">
+                <button type="button" class="period-btn" data-period="day" onclick="setReliabilityPeriod('day')">รายวัน</button>
+                <button type="button" class="period-btn active" data-period="month" onclick="setReliabilityPeriod('month')">รายเดือน</button>
+                <button type="button" class="period-btn" data-period="year" onclick="setReliabilityPeriod('year')">รายปี</button>
+            </div>
         </div>
 
         <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
@@ -129,6 +156,7 @@
         let kpiPieChart, lineStopChart, bmPartChart, pmPartChart;
 
         const PRODUCTION_LINES = ['LINE A', 'LINE B', 'LINE C', 'LINE D'];
+        let currentReliabilityPeriod = 'month';
 
         function destroyCharts() {
             [kpiPieChart, lineStopChart, bmPartChart, pmPartChart].forEach(chart => {
@@ -136,14 +164,48 @@
             });
         }
 
-        function getCurrentReliabilityRange() {
-            if (typeof getCurrentMonthBounds === 'function') return getCurrentMonthBounds();
+        function formatDateOnly(dateObj) {
+            return `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+        }
 
+        function getCurrentReliabilityRange() {
             const now = new Date();
-            const start = new Date(now.getFullYear(), now.getMonth(), 1);
-            const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-            const fmt = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-            return { startDate: fmt(start), endDate: fmt(end) };
+            let start;
+            let end;
+            let label;
+
+            if (currentReliabilityPeriod === 'day') {
+                start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                label = 'รายวัน';
+            } else if (currentReliabilityPeriod === 'year') {
+                start = new Date(now.getFullYear(), 0, 1);
+                end = new Date(now.getFullYear(), 11, 31);
+                label = 'รายปี';
+            } else {
+                start = new Date(now.getFullYear(), now.getMonth(), 1);
+                end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                label = 'รายเดือน';
+            }
+
+            return {
+                startDate: formatDateOnly(start),
+                endDate: formatDateOnly(end),
+                label
+            };
+        }
+
+        function updateReliabilityPeriodButtons() {
+            document.querySelectorAll('[data-period]').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.period === currentReliabilityPeriod);
+            });
+        }
+
+        function setReliabilityPeriod(period) {
+            if (!['day', 'month', 'year'].includes(period)) return;
+            currentReliabilityPeriod = period;
+            updateReliabilityPeriodButtons();
+            initCharts();
         }
 
         function getJobDateForReliability(job) {
@@ -228,7 +290,7 @@
             const kpis = typeof fetchAndCalculateKPIs === 'function' ? fetchAndCalculateKPIs(range.startDate, range.endDate) : null;
 
             const rangeText = document.getElementById('rangeText');
-            if (rangeText) rangeText.textContent = `ช่วงข้อมูล: ${range.startDate} ถึง ${range.endDate}`;
+            if (rangeText) rangeText.textContent = `ช่วงข้อมูล${range.label ? ' ' + range.label : ''}: ${range.startDate} ถึง ${range.endDate}`;
 
             destroyCharts();
 
@@ -293,7 +355,7 @@
             });
         }
 
-        window.addEventListener('DOMContentLoaded', () => { setTimeout(initCharts, 150); });
+        window.addEventListener('DOMContentLoaded', () => { updateReliabilityPeriodButtons(); setTimeout(initCharts, 150); });
         window.addEventListener('dms_jobs_updated', () => { setTimeout(initCharts, 200); });
     </script>
     <script src="app_ui.js"></script>
