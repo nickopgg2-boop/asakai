@@ -231,15 +231,43 @@
             mainChart = new Chart(document.getElementById('mainChart'), {
                 type: 'bar',
                 data: { labels: kpis.trend.labels, datasets: [
-                    { label: 'BM (ฉุกเฉิน)', data: kpis.trend.breakdownSeries, backgroundColor: 'rgba(249, 115, 22, 0.8)', borderColor: '#f97316', borderWidth: 1, borderRadius: 2 },
-                    { label: 'PM (ตามรอบ)', data: kpis.trend.pmSeries, backgroundColor: 'rgba(52, 211, 153, 0.8)', borderColor: '#34d399', borderWidth: 1, borderRadius: 2 }
+                    { 
+                        label: 'งานเข้า', 
+                        data: kpis.trend.incomingSeries || [], 
+                        backgroundColor: 'rgba(148, 163, 184, 0.75)', 
+                        borderColor: '#94a3b8', 
+                        borderWidth: 1, 
+                        borderRadius: 4,
+                        barPercentage: 0.75,
+                        categoryPercentage: 0.72
+                    },
+                    { 
+                        label: 'BM (ฉุกเฉิน)', 
+                        data: kpis.trend.breakdownSeries, 
+                        backgroundColor: 'rgba(249, 115, 22, 0.85)', 
+                        borderColor: '#f97316', 
+                        borderWidth: 1, 
+                        borderRadius: 4,
+                        barPercentage: 0.75,
+                        categoryPercentage: 0.72
+                    },
+                    { 
+                        label: 'PM (ตามรอบ)', 
+                        data: kpis.trend.pmSeries, 
+                        backgroundColor: 'rgba(52, 211, 153, 0.8)', 
+                        borderColor: '#34d399', 
+                        borderWidth: 1, 
+                        borderRadius: 4,
+                        barPercentage: 0.75,
+                        categoryPercentage: 0.72
+                    }
                 ]},
                 options: { 
                     responsive: true, maintainAspectRatio: false,
                     animation: { duration: 700, easing: 'easeOutQuart' },
                     scales: {
-                        x: { stacked: true, grid: { display: false }, ticks: { color: textColor, font: { family: 'Prompt' } } },
-                        y: { stacked: true, grid: { color: gridColor, drawBorder: false }, ticks: { color: textColor } }
+                        x: { stacked: false, grid: { display: false }, ticks: { color: textColor, font: { family: 'Prompt' } } },
+                        y: { stacked: false, beginAtZero: true, grid: { color: gridColor, drawBorder: false }, ticks: { color: textColor, precision: 0 } }
                     },
                     plugins: { 
                         legend: { display: true, labels: { color: '#94a3b8', font: { family: 'Prompt' } } }, 

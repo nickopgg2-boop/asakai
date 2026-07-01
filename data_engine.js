@@ -233,6 +233,14 @@ function getJobDate(job) {
     return getJobReportDate(job);
 }
 
+// Date used for daily incoming job bars. This must use the request date, not the closed/report date.
+function getJobIncomingDate(job = {}) {
+    return toLocalDateOnly(job.requestAt)
+        || toLocalDateOnly(job.plannedDate)
+        || toLocalDateOnly(job.createdAt)
+        || getLocalDateString(new Date());
+}
+
 function minutesBetween(startValue, endValue) {
     const start = parseDateTimeValue(startValue);
     const end = parseDateTimeValue(endValue);
@@ -545,11 +553,12 @@ function fetchAndCalculateKPIs(startDate = null, endDate = null) {
         return b.breakdownCount - a.breakdownCount;
     }).slice(0, 5);
 
-    const trend = { labels: [], dates: [], mttrSeries: [], mtbfSeries: [], breakdownSeries: [], repairMinutesSeries: [], pmSeries: [] };
+    const trend = { labels: [], dates: [], mttrSeries: [], mtbfSeries: [], breakdownSeries: [], repairMinutesSeries: [], pmSeries: [], incomingSeries: [] };
     const datesToPlot = getTrendDates(startDate, endDate);
 
     datesToPlot.forEach(dateStr => {
         const dayJobs = allJobs.filter(j => getJobDate(j) === dateStr);
+        const dayIncomingJobs = allJobs.filter(j => getJobIncomingDate(j) === dateStr);
         const dayBreakdowns = dayJobs.filter(j => j.jobType === 'BM' && j.status === 'closed');
         const dayPMs = dayJobs.filter(j => j.jobType === 'PM' && j.status === 'closed');
         const dayRepairMinutes = dayBreakdowns.reduce((sum, job) => sum + parseNumber(job.downtimeMinutes, 0), 0);
@@ -561,6 +570,7 @@ function fetchAndCalculateKPIs(startDate = null, endDate = null) {
         trend.labels.push(dateStr ? dateStr.slice(5) : '');
         trend.mttrSeries.push(dayMTTR);
         trend.mtbfSeries.push(dayMTBF);
+        trend.incomingSeries.push(dayIncomingJobs.length);
         trend.breakdownSeries.push(dayBreakdowns.length);
         trend.repairMinutesSeries.push(dayRepairMinutes);
         trend.pmSeries.push(dayPMs.length);
