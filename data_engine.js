@@ -252,22 +252,25 @@ function getJobDate(job) {
     return getJobReportDate(job);
 }
 
-// Date used for daily incoming job bars. Prefer reportDate because it is the Asakai/work date.
-// This prevents backfilled jobs entered later from moving to the wrong month.
+// Date used for daily incoming job bars.
+// For the Daily Job Flow chart, the gray bar means the job entered/started repair on that day.
+// Use startTime first because historical Sheet data may be entered later or have reportDate copied from another date.
 function getJobIncomingDate(job = {}) {
-    return toLocalDateOnly(job.reportDate)
+    return toLocalDateOnly(job.startTime)
+        || toLocalDateOnly(job.reportDate)
         || toLocalDateOnly(job.plannedDate)
         || toLocalDateOnly(job.requestAt)
         || toLocalDateOnly(job.createdAt)
         || getLocalDateString(new Date());
 }
 
-// Date used for completed BM/PM bars. Do not use reportDate here; otherwise
-// jobs that start and finish on different days look like they closed immediately.
+// Date used for completed BM/PM bars.
+// For the Daily Job Flow chart, the orange/green bars must follow the actual repair finish date.
+// Use endTime before closedAt because closedAt can be the system close/update timestamp or be copied incorrectly.
 function getJobClosedDate(job = {}) {
     if (String(job.status || '').toLowerCase() !== 'closed') return null;
-    return toLocalDateOnly(job.closedAt)
-        || toLocalDateOnly(job.endTime)
+    return toLocalDateOnly(job.endTime)
+        || toLocalDateOnly(job.closedAt)
         || null;
 }
 
