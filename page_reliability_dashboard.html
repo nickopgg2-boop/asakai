@@ -165,13 +165,13 @@
             </div>
 
             <div class="cyber-card p-6 min-h-[380px]">
-                <h3 class="text-center text-xl font-bold text-slate-200 uppercase tracking-wide mb-4">BM</h3>
+                <h3 class="text-center text-xl font-bold text-slate-200 uppercase tracking-wide mb-4">BM รายวัน</h3>
                 <div class="h-[300px] chart-scroll"><canvas id="bmPartChart"></canvas></div>
             </div>
 
             <div class="cyber-card p-6 min-h-[380px]">
-                <h3 class="text-center text-xl font-bold text-slate-200 uppercase tracking-wide mb-4">PM</h3>
-                <div class="h-[300px]"><canvas id="pmPartChart"></canvas></div>
+                <h3 class="text-center text-xl font-bold text-slate-200 uppercase tracking-wide mb-4">PM รายวัน</h3>
+                <div class="h-[300px] chart-scroll"><canvas id="pmPartChart"></canvas></div>
             </div>
         </div>
     </main>
@@ -414,9 +414,67 @@
         function setChartCanvasWidth(canvasId, itemCount) {
             const canvas = document.getElementById(canvasId);
             if (!canvas) return;
-            const minWidth = Math.max(640, itemCount * 78);
+            const minWidth = Math.max(640, itemCount * 54);
             canvas.style.minWidth = `${minWidth}px`;
             canvas.style.width = `${minWidth}px`;
+        }
+
+        function buildDailyJobTypeSeries(allJobs, jobType, startDate, endDate) {
+            const dateList = buildDateList(startDate, endDate);
+            const labels = [];
+            const values = [];
+            const type = String(jobType || '').toUpperCase();
+
+            dateList.forEach(dateStr => {
+                const count = allJobs.filter(job => {
+                    if (String(job.jobType || '').toUpperCase() !== type) return false;
+                    if (String(job.status || '').toLowerCase() !== 'closed') return false;
+                    const closedDate = getClosedDateForReliability(job);
+                    return closedDate === dateStr;
+                }).length;
+
+                labels.push(dateStr.slice(5));
+                values.push(count);
+            });
+
+            return { labels, values };
+        }
+
+        const reliabilityValueLabelPlugin = {
+            id: 'reliabilityValueLabelPlugin',
+            afterDatasetsDraw(chart) {
+                const { ctx } = chart;
+                ctx.save();
+                ctx.font = '700 11px Prompt, sans-serif';
+                ctx.fillStyle = '#ffffff';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                chart.data.datasets.forEach((dataset, datasetIndex) => {
+                    const meta = chart.getDatasetMeta(datasetIndex);
+                    if (meta.hidden) return;
+
+                    meta.data.forEach((element, index) => {
+                        const raw = Number(dataset.data[index] || 0);
+                        if (!raw) return;
+
+                        const props = element.tooltipPosition();
+                        if (chart.config.type === 'bar') {
+                            ctx.fillText(String(raw), props.x, props.y + 12);
+                        }
+                    });
+                });
+                ctx.restore();
+            }
+        };
+
+        function dailyBarOptions() {
+            const opts = barOptions();
+            opts.scales.y.grace = '15%';
+            opts.scales.x.ticks.maxRotation = 45;
+            opts.scales.x.ticks.minRotation = 0;
+            opts.plugins.legend = { display: false };
+            return opts;
         }
 
         function barOptions() {
@@ -524,25 +582,50 @@
                 options: barOptions()
             });
 
-            const bmRows = topPartCounts(bmJobs, 'BM', null, 0);
-            setChartCanvasWidth('bmPartChart', bmRows.length);
+            const allReliabilityJobs = typeof getAllJobs === 'function' ? getAllJobs() : [];
+
+            const dailyBM = buildDailyJobTypeSeries(allReliabilityJobs, 'BM', range.startDate, range.endDate);
+            setChartCanvasWidth('bmPartChart', dailyBM.labels.length);
             bmPartChart = new Chart(document.getElementById('bmPartChart'), {
                 type: 'bar',
                 data: {
-                    labels: bmRows.map(row => row[0]),
-                    datasets: [{ label: 'BM', data: bmRows.map(row => row[1]), backgroundColor: '#4f7df3', borderRadius: 10, maxBarThickness: 70 }]
+                    labels: dailyBM.labels,
+                    datasets: [{
+                        label: 'BM ปิดงานรายวัน',
+                        data: dailyBM.values,
+                        backgroundColor: 'rgba(249, 115, 22, 0.88)',
+                        borderColor: '#f97316',
+                        borderWidth: 1,
+                        borderRadius: 6,
+                        maxBarThickness: 34,
+                        categoryPercentage: 0.8,
+                        barPercentage: 0.72
+                    }]
                 },
-                options: barOptions()
+                options: dailyBarOptions(),
+                plugins: [reliabilityValueLabelPlugin]
             });
 
-            const pmRows = topPartCounts(pmJobs, 'PM', 4, 4);
+            const dailyPM = buildDailyJobTypeSeries(allReliabilityJobs, 'PM', range.startDate, range.endDate);
+            setChartCanvasWidth('pmPartChart', dailyPM.labels.length);
             pmPartChart = new Chart(document.getElementById('pmPartChart'), {
                 type: 'bar',
                 data: {
-                    labels: pmRows.map(row => row[0]),
-                    datasets: [{ label: 'PM', data: pmRows.map(row => row[1]), backgroundColor: '#4f7df3', borderRadius: 10, maxBarThickness: 70 }]
+                    labels: dailyPM.labels,
+                    datasets: [{
+                        label: 'PM ปิดงานรายวัน',
+                        data: dailyPM.values,
+                        backgroundColor: 'rgba(52, 211, 153, 0.82)',
+                        borderColor: '#34d399',
+                        borderWidth: 1,
+                        borderRadius: 6,
+                        maxBarThickness: 34,
+                        categoryPercentage: 0.8,
+                        barPercentage: 0.72
+                    }]
                 },
-                options: barOptions()
+                options: dailyBarOptions(),
+                plugins: [reliabilityValueLabelPlugin]
             });
         }
 
