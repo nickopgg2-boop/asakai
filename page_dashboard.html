@@ -172,7 +172,7 @@
 
         <div class="cyber-card p-6">
             <div class="flex justify-between items-center mb-6 border-b border-darkborder pb-4">
-                <h4 class="text-sm font-bold uppercase tracking-wider text-slate-300 flex items-center"><i class="fa-solid fa-chart-column mr-2 text-blue-400"></i>จำนวนงานแจ้งซ่อมรวมรายวัน (Daily Breakdowns)</h4>
+                <h4 class="text-sm font-bold uppercase tracking-wider text-slate-300 flex items-center"><i class="fa-solid fa-chart-column mr-2 text-blue-400"></i>สรุปงานซ่อมรายวัน (Daily Job Flow)</h4>
             </div>
             <div class="h-64 sm:h-80"><canvas id="mainChart"></canvas></div>
         </div>
@@ -266,6 +266,19 @@
                         categoryPercentage: 0.86,
                         barPercentage: 0.92,
                         maxBarThickness: 24
+                    },
+                    {
+                        type: 'line',
+                        label: 'งานค้างข้ามวัน',
+                        data: kpis.trend.pendingSeries || [],
+                        borderColor: '#facc15',
+                        backgroundColor: 'rgba(250, 204, 21, 0.18)',
+                        borderWidth: 2,
+                        pointRadius: 3,
+                        pointHoverRadius: 5,
+                        tension: 0.35,
+                        fill: false,
+                        order: 0
                     }
                 ]},
                 options: { 
@@ -288,8 +301,13 @@
                         legend: { display: true, labels: { color: '#94a3b8', font: { family: 'Prompt' } } }, 
                         datalabels: { 
                             color: '#ffffff', 
-                            font: { weight: 'bold' }, 
-                            formatter: (v) => v > 0 ? v : '' 
+                            font: { weight: 'bold' },
+                            align: (ctx) => ctx.dataset.type === 'line' ? 'top' : 'center',
+                            anchor: (ctx) => ctx.dataset.type === 'line' ? 'end' : 'center',
+                            formatter: (v, ctx) => {
+                                if (!v || v <= 0) return '';
+                                return v;
+                            }
                         } 
                     }
                 }

@@ -252,12 +252,44 @@ function getJobDate(job) {
     return getJobReportDate(job);
 }
 
-// Date used for daily incoming job bars. This must use the request date, not the closed/report date.
+// Date used for daily incoming job bars. Prefer reportDate because it is the Asakai/work date.
+// This prevents backfilled jobs entered later from moving to the wrong month.
 function getJobIncomingDate(job = {}) {
-    return toLocalDateOnly(job.requestAt)
+    return toLocalDateOnly(job.reportDate)
         || toLocalDateOnly(job.plannedDate)
+        || toLocalDateOnly(job.requestAt)
         || toLocalDateOnly(job.createdAt)
         || getLocalDateString(new Date());
+}
+
+// Date used for completed BM/PM bars. Do not use reportDate here; otherwise
+// jobs that start and finish on different days look like they closed immediately.
+function getJobClosedDate(job = {}) {
+    if (String(job.status || '').toLowerCase() !== 'closed') return null;
+    return toLocalDateOnly(job.closedAt)
+        || toLocalDateOnly(job.endTime)
+        || null;
+}
+
+function compareDateString(a, b) {
+    const da = toLocalDateOnly(a);
+    const db = toLocalDateOnly(b);
+    if (!da || !db) return null;
+    if (da < db) return -1;
+    if (da > db) return 1;
+    return 0;
+}
+
+function isJobPendingOnDate(job = {}, dateStr) {
+    const incomingDate = getJobIncomingDate(job);
+    if (!incomingDate || !dateStr || incomingDate > dateStr) return false;
+
+    const closedDate = getJobClosedDate(job);
+    // If not closed yet, it remains pending after the incoming date.
+    if (!closedDate) return true;
+
+    // Pending through days before the closed date. Closed date itself is counted as completed, not pending.
+    return closedDate > dateStr;
 }
 
 function minutesBetween(startValue, endValue) {
@@ -628,18 +660,36 @@ function fetchAndCalculateKPIs(startDate = null, endDate = null, options = {}) {
         return b.breakdownCount - a.breakdownCount;
     }).slice(0, 5);
 
-    const trend = { labels: [], dates: [], mttrSeries: [], mtbfSeries: [], breakdownSeries: [], repairMinutesSeries: [], pmSeries: [], incomingSeries: [] };
+    const trend = {
+        labels: [],
+        dates: [],
+        mttrSeries: [],
+        mtbfSeries: [],
+        breakdownSeries: [],
+        repairMinutesSeries: [],
+        pmSeries: [],
+        incomingSeries: [],
+        pendingSeries: []
+    };
     const datesToPlot = getTrendDates(startDate, endDate);
 
     datesToPlot.forEach(dateStr => {
-        const dayJobs = allJobs.filter(j => getJobDateByMode(j, dateMode) === dateStr);
+        // Daily job flow uses separate dates by purpose:
+        // - Incoming: reportDate/plannedDate/requestAt
+        // - Completed BM/PM: closedAt/endTime
+        // - Pending: entered before this day and not yet closed before this day
         const dayIncomingJobs = allJobs.filter(j => getJobIncomingDate(j) === dateStr);
-        const dayBreakdowns = dayJobs.filter(j => j.jobType === 'BM' && j.status === 'closed');
-        const dayKpiBreakdowns = dayJobs.filter(j => isClosedBmOnSite(j) && isValidRepairDuration(j));
-        const dayPMs = dayJobs.filter(j => j.jobType === 'PM' && j.status === 'closed');
+        const dayClosedJobs = allJobs.filter(j => getJobClosedDate(j) === dateStr);
+        const dayPendingJobs = allJobs.filter(j => isJobPendingOnDate(j, dateStr));
+
+        const dayBreakdowns = dayClosedJobs.filter(j => j.jobType === 'BM');
+        const dayKpiBreakdowns = dayClosedJobs.filter(j => isClosedBmOnSite(j) && isValidRepairDuration(j));
+        const dayPMs = dayClosedJobs.filter(j => j.jobType === 'PM');
         const dayRepairMinutes = dayKpiBreakdowns.reduce((sum, job) => sum + parseNumber(job.downtimeMinutes, 0), 0);
         const dayMTTR = dayKpiBreakdowns.length > 0 ? Math.round(dayRepairMinutes / dayKpiBreakdowns.length) : 0;
-        const dayRunningMinutes = Math.max(getShiftMinutesForDay(dayJobs) - dayRepairMinutes, 0);
+
+        const dayShiftSourceJobs = dayIncomingJobs.length || dayClosedJobs.length ? [...dayIncomingJobs, ...dayClosedJobs] : dayPendingJobs;
+        const dayRunningMinutes = Math.max(getShiftMinutesForDay(dayShiftSourceJobs) - dayRepairMinutes, 0);
         const dayMTBF = dayKpiBreakdowns.length > 0 ? Math.round(dayRunningMinutes / dayKpiBreakdowns.length) : 0;
 
         trend.dates.push(dateStr);
@@ -650,6 +700,7 @@ function fetchAndCalculateKPIs(startDate = null, endDate = null, options = {}) {
         trend.breakdownSeries.push(dayBreakdowns.length);
         trend.repairMinutesSeries.push(dayRepairMinutes);
         trend.pmSeries.push(dayPMs.length);
+        trend.pendingSeries.push(dayPendingJobs.length);
     });
 
     return {
