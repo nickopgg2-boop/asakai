@@ -174,7 +174,7 @@
             <div class="flex justify-between items-center mb-6 border-b border-darkborder pb-4">
                 <h4 class="text-sm font-bold uppercase tracking-wider text-slate-300 flex items-center"><i class="fa-solid fa-chart-column mr-2 text-blue-400"></i>สรุปงานซ่อมรายวัน (Daily Job Flow)</h4>
             </div>
-            <div class="h-64 sm:h-80"><canvas id="mainChart"></canvas></div>
+            <div class="h-[360px] sm:h-[440px] pt-4"><canvas id="mainChart"></canvas></div>
         </div>
     </main>
 
@@ -282,7 +282,9 @@
                     }
                 ]},
                 options: { 
-                    responsive: true, maintainAspectRatio: false,
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    layout: { padding: { top: 36, right: 20, bottom: 10, left: 6 } },
                     animation: { duration: 700, easing: 'easeOutQuart' },
                     scales: {
                         x: { 
@@ -292,18 +294,31 @@
                         },
                         y: { 
                             stacked: true, 
-                            beginAtZero: true, 
+                            beginAtZero: true,
+                            grace: '22%',
                             grid: { color: gridColor, drawBorder: false }, 
                             ticks: { color: textColor, precision: 0 } 
                         }
                     },
                     plugins: { 
-                        legend: { display: true, labels: { color: '#94a3b8', font: { family: 'Prompt' } } }, 
+                        legend: { 
+                            display: true,
+                            position: 'top',
+                            align: 'center',
+                            labels: { 
+                                color: '#94a3b8', 
+                                font: { family: 'Prompt', size: 12 },
+                                boxWidth: 34,
+                                padding: 18
+                            } 
+                        }, 
                         datalabels: { 
                             color: '#ffffff', 
-                            font: { weight: 'bold' },
-                            align: (ctx) => ctx.dataset.type === 'line' ? 'top' : 'center',
-                            anchor: (ctx) => ctx.dataset.type === 'line' ? 'end' : 'center',
+                            font: { weight: 'bold', size: 11 },
+                            display: (ctx) => ctx.dataset.type !== 'line',
+                            align: 'center',
+                            anchor: 'center',
+                            clamp: true,
                             formatter: (v, ctx) => {
                                 if (!v || v <= 0) return '';
                                 return v;
