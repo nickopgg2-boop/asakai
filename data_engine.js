@@ -700,9 +700,12 @@ function fetchAndCalculateKPIs(startDate = null, endDate = null, options = {}) {
         // - Incoming: reportDate/plannedDate/requestAt
         // - Completed BM/PM: closedAt/endTime
         // - Pending: entered before this day and not yet closed before this day
-        const dayIncomingJobs = allJobs.filter(j => getJobIncomingDate(j) === dateStr);
-        const dayClosedJobs = allJobs.filter(j => getJobClosedDate(j) === dateStr);
-        const dayPendingJobs = allJobs.filter(j => isJobPendingOnDate(j, dateStr));
+        // Use the same filtered job set as the summary cards.
+        // This prevents a month from showing graph bars while the KPI cards are 0.
+        // The date filter is based on reportDate by default; graph dates then split the selected jobs by start/end/pending dates.
+        const dayIncomingJobs = filteredJobs.filter(j => getJobIncomingDate(j) === dateStr);
+        const dayClosedJobs = filteredJobs.filter(j => getJobClosedDate(j) === dateStr);
+        const dayPendingJobs = filteredJobs.filter(j => isJobPendingOnDate(j, dateStr));
 
         const dayBreakdowns = dayClosedJobs.filter(j => j.jobType === 'BM');
         const dayKpiBreakdowns = dayClosedJobs.filter(j => isClosedBmOnSite(j) && isValidRepairDuration(j));
