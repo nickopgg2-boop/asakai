@@ -56,11 +56,15 @@
             document.documentElement.classList.add('dark');
             checkAccess(); hideUnauthorizedMenus();
             document.getElementById('requestAt').value = getCurrentDatetimeLocal();
+            document.getElementById('reportDate').value = getCurrentDateLocal();
         });
         function getCurrentDatetimeLocal() {
             const now = new Date();
             const offsetMs = now.getTimezoneOffset() * 60 * 1000;
             return (new Date(now.getTime() - offsetMs)).toISOString().slice(0, 16);
+        }
+        function getCurrentDateLocal() {
+            return getCurrentDatetimeLocal().slice(0, 10);
         }
     </script>
     <style>
@@ -70,7 +74,7 @@
         .cyber-card { background-color: #151f32; border: 1px solid #1e293b; border-radius: 1rem; }
         input[type=number]::-webkit-inner-spin-button, 
         input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-        input[type="datetime-local"]::-webkit-calendar-picker-indicator { cursor: pointer; filter: invert(1); }
+        input[type="datetime-local"]::-webkit-calendar-picker-indicator, input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; filter: invert(1); }
     </style>
 </head>
 <body class="min-h-screen flex flex-col font-prompt selection:bg-blue-500/30">
@@ -146,10 +150,15 @@
                             <label class="block text-xs font-bold text-slate-400 uppercase mb-2">รหัสใบแจ้งซ่อม SAP <span class="text-rose-500">*</span></label>
                             <input type="text" id="sapRef" required placeholder="เช่น 400012345" class="w-full bg-[#0f172a] text-slate-200 border border-slate-700 rounded-xl px-4 py-3 text-sm font-mono outline-none focus:border-blue-500">
                         </div>
-                        <div class="md:col-span-2">
+                        <div>
                              <label class="block text-xs font-bold text-slate-400 uppercase mb-2">วันที่และเวลาที่แจ้ง <span class="text-rose-500">*</span></label>
                              <input type="datetime-local" id="requestAt" required class="w-full bg-[#0f172a] text-slate-200 border border-slate-700 rounded-xl px-4 py-3 text-sm font-mono outline-none focus:border-blue-500">
-                             <button type="button" onclick="document.getElementById('requestAt').value = getCurrentDatetimeLocal()" class="text-[10px] font-bold text-blue-400 mt-2 hover:underline"><i class="fa-solid fa-clock"></i> ใช้เวลาปัจจุบัน</button>
+                             <button type="button" onclick="document.getElementById('requestAt').value = getCurrentDatetimeLocal(); if(!document.getElementById('reportDate').value) document.getElementById('reportDate').value = getCurrentDateLocal();" class="text-[10px] font-bold text-blue-400 mt-2 hover:underline"><i class="fa-solid fa-clock"></i> ใช้เวลาปัจจุบัน</button>
+                        </div>
+                        <div>
+                             <label class="block text-xs font-bold text-slate-400 uppercase mb-2">วันที่รายงาน / Asakai <span class="text-rose-500">*</span></label>
+                             <input type="date" id="reportDate" required class="w-full bg-[#0f172a] text-slate-200 border border-slate-700 rounded-xl px-4 py-3 text-sm font-mono outline-none focus:border-blue-500">
+                             <p class="text-[10px] text-slate-500 mt-1.5 ml-1">ใช้เป็นวันที่หลักของ Dashboard / KPI / Reliability</p>
                         </div>
                     </div>
                 </div>
@@ -290,10 +299,11 @@
             const jobType = document.getElementById('jobType').value;
             const repairSiteType = jobType === 'BM' ? document.getElementById('repairSiteType').value : 'not_applicable';
             const requestAt = document.getElementById('requestAt').value;
+            const reportDate = document.getElementById('reportDate').value;
             const stockVal = document.getElementById('stockValue').value;
             const stockUnit = document.getElementById('stockUnit').value;
 
-            if (!sap || !dept || !productionLine || !dieId || !partName || !partNumber || !model || !rawDefect || !priority || !requestAt || stockVal === '') {
+            if (!sap || !dept || !productionLine || !dieId || !partName || !partNumber || !model || !rawDefect || !priority || !requestAt || !reportDate || stockVal === '') {
                 if (typeof showToast === 'function') showToast('กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบทุกช่อง', 'error');
                 else alert('กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบทุกช่อง');
                 return;
@@ -309,7 +319,8 @@
             saveJob({
                 jobId: reqId,
                 requestAt,
-                plannedDate: dateStr,
+                plannedDate: reportDate,
+                reportDate,
                 sap,
                 dept,
                 productionLine,
@@ -332,6 +343,7 @@
 
             e.target.reset();
             document.getElementById('requestAt').value = getCurrentDatetimeLocal();
+            document.getElementById('reportDate').value = getCurrentDateLocal();
         }
     </script>
     <script src="app_ui.js"></script>

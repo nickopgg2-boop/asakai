@@ -6,6 +6,7 @@ const DMS_SHEET_API_KEY = 'dms_sheet_api_url';
 const DMS_DEFAULT_SHEET_API_URL = 'https://script.google.com/macros/s/AKfycbyneqZah0eShidCeljYAdX5WVQlJSIVN52AtdWaAk7Hj-7_MbKMxhIoqMHKaSA9muXr0g/exec';
 // โรงงานใช้งานเวลาไทยเป็นหลัก; ใช้สำหรับแปลงค่า ISO UTC จาก Google Sheet เช่น 2026-06-28T17:00:00.000Z => 2026-06-29
 const DMS_TIMEZONE_OFFSET_MINUTES = 7 * 60;
+const DMS_MAX_REPAIR_MINUTES = 3 * 24 * 60; // 3 วัน = 4,320 นาที ใช้กัน KPI เพี้ยน
 
 function getDmsSheetApiUrl() {
     return (localStorage.getItem(DMS_SHEET_API_KEY) || DMS_DEFAULT_SHEET_API_URL || '').trim();
@@ -214,18 +215,36 @@ function isDateInRange(dateStr, startDate, endDate) {
 }
 
 function getJobReportDate(job = {}) {
-    const status = String(job.status || '').toLowerCase();
-    if (status === 'closed' || status === 'done') {
-        return toLocalDateOnly(job.closedAt)
-            || toLocalDateOnly(job.endTime)
-            || toLocalDateOnly(job.plannedDate)
-            || toLocalDateOnly(job.requestAt)
-            || getLocalDateString(new Date());
-    }
-    return toLocalDateOnly(job.plannedDate)
-        || toLocalDateOnly(job.requestAt)
+    // Phase 1: reportDate is the main date for Asakai/Dashboard/KPI filtering.
+    // Keep old data compatible by falling back to plannedDate -> closedAt/endTime -> requestAt.
+    return toLocalDateOnly(job.reportDate)
+        || toLocalDateOnly(job.plannedDate)
         || toLocalDateOnly(job.closedAt)
+        || toLocalDateOnly(job.endTime)
+        || toLocalDateOnly(job.requestAt)
+        || toLocalDateOnly(job.updatedAt)
         || getLocalDateString(new Date());
+}
+
+function getJobDateByMode(job = {}, mode = 'report') {
+    const dateMode = String(mode || 'report').toLowerCase();
+    if (dateMode === 'request' || dateMode === 'requestat') {
+        return toLocalDateOnly(job.requestAt) || getJobReportDate(job);
+    }
+    if (dateMode === 'closed' || dateMode === 'closedat') {
+        return toLocalDateOnly(job.closedAt) || toLocalDateOnly(job.endTime) || getJobReportDate(job);
+    }
+    if (dateMode === 'planned' || dateMode === 'planneddate') {
+        return toLocalDateOnly(job.plannedDate) || getJobReportDate(job);
+    }
+    if (dateMode === 'updated' || dateMode === 'updatedat') {
+        return toLocalDateOnly(job.updatedAt) || getJobReportDate(job);
+    }
+    return getJobReportDate(job);
+}
+
+function isDateInRangeByMode(job, startDate, endDate, dateMode = 'report') {
+    return isDateInRange(getJobDateByMode(job, dateMode), startDate, endDate);
 }
 
 // Public function used by pages/KPI. Closed jobs are reported by closedAt/endTime first.
@@ -264,6 +283,50 @@ function calculateJobDowntimeMinutes(job) {
     return diff;
 }
 
+function parseEditHistory(value) {
+    if (!value) return [];
+    if (Array.isArray(value)) return value;
+    try {
+        const parsed = JSON.parse(String(value));
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (err) {
+        return [];
+    }
+}
+
+function isValidRepairDuration(job) {
+    const mins = parseNumber(job && job.downtimeMinutes, 0);
+    return mins >= 0 && mins <= DMS_MAX_REPAIR_MINUTES;
+}
+
+function getJobDataIssues(job = {}) {
+    const issues = [];
+    const mins = parseNumber(job.downtimeMinutes, 0);
+    const start = parseDateTimeValue(job.startTime);
+    const end = parseDateTimeValue(job.endTime || job.closedAt);
+
+    if (!toLocalDateOnly(job.reportDate)) issues.push('ไม่มีวันที่รายงาน');
+    if (!job.productionLine) issues.push('ไม่มีไลน์ผลิต');
+    if (!job.partNumber) issues.push('ไม่มี Part Number');
+    if (job.jobType === 'BM' && !job.repairSiteType) issues.push('ไม่มีประเภท BM On Site/No Site');
+    if (job.status === 'closed' && job.jobType === 'BM' && mins > DMS_MAX_REPAIR_MINUTES) issues.push('เวลาซ่อมเกิน 3 วัน');
+    if (job.status === 'closed' && start && end && end.getTime() < start.getTime()) issues.push('เวลาจบงานก่อนเวลาเริ่มงาน');
+
+    const requestMonth = toLocalDateOnly(job.requestAt)?.slice(0, 7);
+    const reportMonth = toLocalDateOnly(job.reportDate)?.slice(0, 7);
+    if (requestMonth && reportMonth && requestMonth !== reportMonth) issues.push('เดือนที่บันทึกกับเดือนรายงานไม่ตรงกัน');
+
+    return issues;
+}
+
+function getDataQualityIssues(startDate = null, endDate = null, options = {}) {
+    const dateMode = options.dateMode || 'report';
+    return getAllJobs()
+        .filter(job => !(startDate || endDate) || isDateInRangeByMode(job, startDate, endDate, dateMode))
+        .map(job => ({ job, issues: getJobDataIssues(job) }))
+        .filter(item => item.issues.length > 0);
+}
+
 function normalizeJob(job = {}) {
     const requestAt = toLocalDateTimeOnly(job.requestAt || job.time) || getLocalISOString();
     const closedAt = toLocalDateTimeOnly(job.closedAt) || null;
@@ -272,6 +335,12 @@ function normalizeJob(job = {}) {
     const plannedDate = toLocalDateOnly(job.plannedDate)
         || toLocalDateOnly(requestAt)
         || toLocalDateOnly(closedAt)
+        || getLocalDateString(new Date());
+    const reportDate = toLocalDateOnly(job.reportDate)
+        || plannedDate
+        || toLocalDateOnly(closedAt)
+        || toLocalDateOnly(endTime)
+        || toLocalDateOnly(requestAt)
         || getLocalDateString(new Date());
 
     const rawStatus = String(job.status || 'pending').trim().toLowerCase();
@@ -283,6 +352,7 @@ function normalizeJob(job = {}) {
         jobId: String(job.jobId || job.id || `REQ-${Date.now()}`),
         requestAt,
         plannedDate,
+        reportDate,
         sap: job.sap || job.sapRef || '',
         dept: String(job.dept || 'UNKNOWN-DEPT').toUpperCase(),
         dieId: String(job.dieId || job.assetId || 'UNKNOWN-DIE').toUpperCase(),
@@ -306,7 +376,9 @@ function normalizeJob(job = {}) {
         closedAt,
         isScheduledForProduction: parseBoolean(job.isScheduledForProduction, true),
         shiftPlannedMinutes: parseNumber(job.shiftPlannedMinutes, 480),
-        updatedAt: toLocalDateTimeOnly(job.updatedAt) || job.updatedAt || null
+        updatedAt: toLocalDateTimeOnly(job.updatedAt) || job.updatedAt || null,
+        updatedBy: job.updatedBy || null,
+        editHistory: Array.isArray(job.editHistory) ? job.editHistory : parseEditHistory(job.editHistory)
     };
 
     if (normalized.status !== 'closed') {
@@ -489,23 +561,25 @@ function getShiftMinutesForDay(dayJobs) {
     return activeCount * shift;
 }
 
-function fetchAndCalculateKPIs(startDate = null, endDate = null) {
+function fetchAndCalculateKPIs(startDate = null, endDate = null, options = {}) {
     const allJobs = getAllJobs();
+    const dateMode = options.dateMode || 'report';
     const hasDateFilter = Boolean(startDate || endDate);
-    const filteredJobs = hasDateFilter ? allJobs.filter(j => isDateInRange(getJobDate(j), startDate, endDate)) : allJobs;
+    const filteredJobs = hasDateFilter ? allJobs.filter(j => isDateInRangeByMode(j, startDate, endDate, dateMode)) : allJobs;
 
     const closedJobs = filteredJobs.filter(j => j.status === 'closed');
     const breakdowns = closedJobs.filter(j => j.jobType === 'BM');
+    const kpiBreakdowns = closedJobs.filter(j => isClosedBmOnSite(j) && isValidRepairDuration(j));
     const pmClosed = closedJobs.filter(j => j.jobType === 'PM');
 
-    const totalRepairMinutes = breakdowns.reduce((sum, job) => sum + parseNumber(job.downtimeMinutes, 0), 0);
-    const avgMTTR = breakdowns.length > 0 ? Math.round(totalRepairMinutes / breakdowns.length) : 0;
+    const totalRepairMinutes = kpiBreakdowns.reduce((sum, job) => sum + parseNumber(job.downtimeMinutes, 0), 0);
+    const avgMTTR = kpiBreakdowns.length > 0 ? Math.round(totalRepairMinutes / kpiBreakdowns.length) : 0;
 
-    const uniqueDates = [...new Set(breakdowns.map(getJobDate).filter(Boolean))];
+    const uniqueDates = [...new Set(kpiBreakdowns.map(job => getJobDateByMode(job, dateMode)).filter(Boolean))];
     let sumDailyMTBF = 0;
     uniqueDates.forEach(dateStr => {
-        const dayBreakdowns = breakdowns.filter(j => getJobDate(j) === dateStr);
-        const dayJobs = filteredJobs.filter(j => getJobDate(j) === dateStr);
+        const dayBreakdowns = kpiBreakdowns.filter(j => getJobDateByMode(j, dateMode) === dateStr);
+        const dayJobs = filteredJobs.filter(j => getJobDateByMode(j, dateMode) === dateStr);
         const dailyRepairMinutes = dayBreakdowns.reduce((sum, job) => sum + parseNumber(job.downtimeMinutes, 0), 0);
         const runningMinutes = Math.max(getShiftMinutesForDay(dayJobs) - dailyRepairMinutes, 0);
         sumDailyMTBF += dayBreakdowns.length > 0 ? Math.round(runningMinutes / dayBreakdowns.length) : 0;
@@ -517,12 +591,13 @@ function fetchAndCalculateKPIs(startDate = null, endDate = null) {
     depts.forEach(dept => {
         const deptJobs = filteredJobs.filter(j => j.dept === dept);
         const deptBreakdowns = breakdowns.filter(j => j.dept === dept);
-        const deptRepairMinutes = deptBreakdowns.reduce((sum, job) => sum + parseNumber(job.downtimeMinutes, 0), 0);
+        const deptKpiBreakdowns = kpiBreakdowns.filter(j => j.dept === dept);
+        const deptRepairMinutes = deptKpiBreakdowns.reduce((sum, job) => sum + parseNumber(job.downtimeMinutes, 0), 0);
         byDept[dept] = {
             totalJobs: deptJobs.length,
             breakdowns: deptBreakdowns.length,
             repairMinutes: deptRepairMinutes,
-            mttr: deptBreakdowns.length > 0 ? Math.round(deptRepairMinutes / deptBreakdowns.length) : 0
+            mttr: deptKpiBreakdowns.length > 0 ? Math.round(deptRepairMinutes / deptKpiBreakdowns.length) : 0
         };
     });
 
@@ -557,14 +632,15 @@ function fetchAndCalculateKPIs(startDate = null, endDate = null) {
     const datesToPlot = getTrendDates(startDate, endDate);
 
     datesToPlot.forEach(dateStr => {
-        const dayJobs = allJobs.filter(j => getJobDate(j) === dateStr);
+        const dayJobs = allJobs.filter(j => getJobDateByMode(j, dateMode) === dateStr);
         const dayIncomingJobs = allJobs.filter(j => getJobIncomingDate(j) === dateStr);
         const dayBreakdowns = dayJobs.filter(j => j.jobType === 'BM' && j.status === 'closed');
+        const dayKpiBreakdowns = dayJobs.filter(j => isClosedBmOnSite(j) && isValidRepairDuration(j));
         const dayPMs = dayJobs.filter(j => j.jobType === 'PM' && j.status === 'closed');
-        const dayRepairMinutes = dayBreakdowns.reduce((sum, job) => sum + parseNumber(job.downtimeMinutes, 0), 0);
-        const dayMTTR = dayBreakdowns.length > 0 ? Math.round(dayRepairMinutes / dayBreakdowns.length) : 0;
+        const dayRepairMinutes = dayKpiBreakdowns.reduce((sum, job) => sum + parseNumber(job.downtimeMinutes, 0), 0);
+        const dayMTTR = dayKpiBreakdowns.length > 0 ? Math.round(dayRepairMinutes / dayKpiBreakdowns.length) : 0;
         const dayRunningMinutes = Math.max(getShiftMinutesForDay(dayJobs) - dayRepairMinutes, 0);
-        const dayMTBF = dayBreakdowns.length > 0 ? Math.round(dayRunningMinutes / dayBreakdowns.length) : 0;
+        const dayMTBF = dayKpiBreakdowns.length > 0 ? Math.round(dayRunningMinutes / dayKpiBreakdowns.length) : 0;
 
         trend.dates.push(dateStr);
         trend.labels.push(dateStr ? dateStr.slice(5) : '');
@@ -581,6 +657,7 @@ function fetchAndCalculateKPIs(startDate = null, endDate = null) {
             startDate: startDate || null,
             endDate: endDate || null,
             hasDateFilter,
+            dateMode,
             trendStartDate: datesToPlot[0] || null,
             trendEndDate: datesToPlot[datesToPlot.length - 1] || null
         },
@@ -588,10 +665,12 @@ function fetchAndCalculateKPIs(startDate = null, endDate = null) {
             totalJobs: filteredJobs.length,
             totalClosedJobs: closedJobs.length,
             totalBreakdowns: breakdowns.length,
+            totalKpiBreakdowns: kpiBreakdowns.length,
             totalPMs: pmClosed.length,
             totalRepairMinutes,
             avgMTTR,
-            avgMTBF
+            avgMTBF,
+            anomalyJobs: getDataQualityIssues(startDate, endDate, { dateMode }).length
         },
         byDept,
         trend,
@@ -613,11 +692,11 @@ function getKpiAnalysisJobs(startDate = null, endDate = null, options = {}) {
     const dept = String(options.dept || '').toUpperCase();
 
     return getAllJobs().filter(job => {
-        if ((startDate || endDate) && !isDateInRange(getJobDate(job), startDate, endDate)) return false;
+        if ((startDate || endDate) && !isDateInRangeByMode(job, startDate, endDate, options.dateMode || 'report')) return false;
         if (line && job.productionLine !== line) return false;
         if (dept && job.dept !== dept) return false;
 
-        if (mode === 'bm_on_site') return isClosedBmOnSite(job);
+        if (mode === 'bm_on_site') return isClosedBmOnSite(job) && isValidRepairDuration(job);
         if (mode === 'bm_no_site') return isClosedBmNoSite(job);
         if (mode === 'bm_all') return job.status === 'closed' && job.jobType === 'BM';
         if (mode === 'pm') return job.status === 'closed' && job.jobType === 'PM';
@@ -629,7 +708,7 @@ function getKpiAnalysisJobs(startDate = null, endDate = null, options = {}) {
 
 function getDieMasterData(startDate = null, endDate = null) {
     const allJobs = getAllJobs();
-    const filteredJobs = (startDate || endDate) ? allJobs.filter(j => isDateInRange(getJobDate(j), startDate, endDate)) : allJobs;
+    const filteredJobs = (startDate || endDate) ? allJobs.filter(j => isDateInRangeByMode(j, startDate, endDate, 'report')) : allJobs;
     const closedBreakdowns = filteredJobs.filter(j => j.status === 'closed' && j.jobType === 'BM');
     const analysisDays = getAnalysisDays(filteredJobs, startDate, endDate);
     const dieStats = {};

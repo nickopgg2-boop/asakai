@@ -276,7 +276,7 @@
                         <p class="text-[11px] text-slate-400 line-clamp-2" title="${escapeHTML(job.defect)}">${escapeHTML(job.defect || 'ไม่มีรายละเอียดปัญหา')}</p>
 
                         <div class="grid grid-cols-2 gap-2 text-[10px] text-slate-500 pt-1 border-t border-slate-800/80">
-                            <div><span class="block text-slate-600">วันที่งาน</span><span class="font-mono text-slate-400">${escapeHTML(job.plannedDate || '-')}</span></div>
+                            <div><span class="block text-slate-600">วันที่งาน</span><span class="font-mono text-slate-400">${escapeHTML(job.reportDate || job.plannedDate || '-')}</span></div>
                             <div><span class="block text-slate-600">เริ่มงาน</span><span class="font-mono text-slate-400">${escapeHTML(formatDateTimeShort(job.startTime))}</span></div>
                         </div>
 
@@ -404,6 +404,9 @@
                 job.rootCause = job.rootCause || 'รอระบุรายละเอียดเพิ่มเติม';
                 if (typeof calculateJobDowntimeMinutes === 'function') {
                     job.downtimeMinutes = calculateJobDowntimeMinutes(job) || 0;
+                    if (typeof DMS_MAX_REPAIR_MINUTES !== 'undefined' && job.downtimeMinutes > DMS_MAX_REPAIR_MINUTES && typeof showToast === 'function') {
+                        showToast('ตรวจสอบข้อมูล: เวลาซ่อมเกิน 3 วัน', 'warning');
+                    }
                 }
             }
 

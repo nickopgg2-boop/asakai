@@ -109,6 +109,11 @@
                 <input type="date" id="filterStart" class="bg-darkcard text-slate-200 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono outline-none focus:border-blue-500">
                 <span class="text-slate-500">-</span>
                 <input type="date" id="filterEnd" class="bg-darkcard text-slate-200 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono outline-none focus:border-blue-500">
+                <select id="filterDateMode" class="bg-darkcard text-slate-200 border border-slate-700 rounded-xl px-3 py-2 text-xs outline-none focus:border-blue-500">
+                    <option value="report">วันที่รายงาน</option>
+                    <option value="request">วันที่แจ้ง</option>
+                    <option value="closed">วันที่ปิดงาน</option>
+                </select>
                 <select id="filterLine" class="bg-darkcard text-slate-200 border border-slate-700 rounded-xl px-3 py-2 text-xs outline-none focus:border-blue-500">
                     <option value="">ทุกไลน์</option>
                     <option value="LINE A">LINE A</option>
@@ -137,7 +142,12 @@
 
         <div class="bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-2xl px-4 py-3 text-xs leading-6">
             <i class="fa-solid fa-triangle-exclamation mr-1"></i>
-            หมายเหตุ: KPI หน้าเครื่องให้ใช้เฉพาะ <b>BM On Site</b> เท่านั้น ส่วน BM No Site ใช้ดูภาระงานซ่อมในแผนก ไม่ควรนำไปปนกับ MTTR / MTBF หน้าเครื่อง
+            หมายเหตุ: KPI หน้าเครื่องให้ใช้เฉพาะ <b>BM On Site</b> เท่านั้น ส่วน BM No Site ใช้ดูภาระงานซ่อมในแผนก ไม่ควรนำไปปนกับ MTTR / MTBF หน้าเครื่อง และงานที่ downtime เกิน 3 วันจะไม่นำมาคิด KPI
+        </div>
+
+        <div id="dataQualityBox" class="hidden bg-rose-500/10 border border-rose-500/30 text-rose-300 rounded-2xl px-4 py-3 text-xs leading-6">
+            <div class="font-bold mb-1"><i class="fa-solid fa-shield-halved mr-1"></i> ข้อมูลผิดปกติที่ควรตรวจสอบ</div>
+            <div id="dataQualityList"></div>
         </div>
 
         <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-4">
@@ -240,6 +250,7 @@
             return {
                 startDate: document.getElementById('filterStart').value,
                 endDate: document.getElementById('filterEnd').value,
+                dateMode: document.getElementById('filterDateMode').value,
                 line: document.getElementById('filterLine').value,
                 dept: document.getElementById('filterDept').value,
                 mode: document.getElementById('filterMode').value
@@ -247,7 +258,7 @@
         }
 
         function matchBaseFilters(job, filters) {
-            if ((filters.startDate || filters.endDate) && !isDateInRange(getJobDate(job), filters.startDate, filters.endDate)) return false;
+            if ((filters.startDate || filters.endDate) && !isDateInRangeByMode(job, filters.startDate, filters.endDate, filters.dateMode || 'report')) return false;
             if (filters.line && job.productionLine !== filters.line) return false;
             if (filters.dept && job.dept !== filters.dept) return false;
             return true;
@@ -255,7 +266,7 @@
 
         function matchMode(job, mode) {
             const site = typeof normalizeRepairSiteType === 'function' ? normalizeRepairSiteType(job.repairSiteType, job.jobType) : (job.repairSiteType || 'on_site');
-            if (mode === 'bm_on_site') return job.status === 'closed' && job.jobType === 'BM' && site === 'on_site';
+            if (mode === 'bm_on_site') return job.status === 'closed' && job.jobType === 'BM' && site === 'on_site' && (typeof isValidRepairDuration !== 'function' || isValidRepairDuration(job));
             if (mode === 'bm_no_site') return job.status === 'closed' && job.jobType === 'BM' && site === 'no_site';
             if (mode === 'bm_all') return job.status === 'closed' && job.jobType === 'BM';
             if (mode === 'pm') return job.status === 'closed' && job.jobType === 'PM';
@@ -343,8 +354,8 @@
             const dailyMtbf = [];
 
             dates.forEach(dateStr => {
-                const daySource = sourceJobs.filter(job => getJobDate(job) === dateStr);
-                const dayBase = baseJobs.filter(job => getJobDate(job) === dateStr);
+                const daySource = sourceJobs.filter(job => getJobDateByMode(job, filters.dateMode || 'report') === dateStr);
+                const dayBase = baseJobs.filter(job => getJobDateByMode(job, filters.dateMode || 'report') === dateStr);
                 const dayDowntime = daySource.reduce((sum, job) => sum + n(job.downtimeMinutes), 0);
                 const count = daySource.length;
                 dailyMttr.push(count ? Math.round(dayDowntime / count) : 0);
@@ -395,6 +406,7 @@
             topProblemChart = makeBarChart('topProblemChart', topProblems.map(x => x.key.length > 28 ? x.key.slice(0, 28) + '...' : x.key), topProblems.map(x => x.count), 'Count', true);
 
             renderSourceTable(sourceJobs);
+            renderDataQuality(filters);
         }
 
         function renderSourceTable(rows) {
@@ -418,6 +430,25 @@
             `).join('');
         }
 
+        function renderDataQuality(filters) {
+            const box = document.getElementById('dataQualityBox');
+            const list = document.getElementById('dataQualityList');
+            if (!box || !list || typeof getDataQualityIssues !== 'function') return;
+
+            const issues = getDataQualityIssues(filters.startDate, filters.endDate, { dateMode: filters.dateMode || 'report' });
+            if (!issues.length) {
+                box.classList.add('hidden');
+                list.innerHTML = '';
+                return;
+            }
+
+            box.classList.remove('hidden');
+            list.innerHTML = issues.slice(0, 8).map(item => {
+                const job = item.job || {};
+                return `<div class="mt-1"><span class="font-mono text-rose-200">${job.jobId || '-'}</span> : ${item.issues.join(', ')}</div>`;
+            }).join('') + (issues.length > 8 ? `<div class="mt-1 text-rose-200">และอีก ${issues.length - 8} รายการ</div>` : '');
+        }
+
         function applyFilters() {
             renderKpiAnalytics();
         }
@@ -426,6 +457,7 @@
             const bounds = getCurrentMonthBounds();
             document.getElementById('filterStart').value = bounds.startDate;
             document.getElementById('filterEnd').value = bounds.endDate;
+            document.getElementById('filterDateMode').value = 'report';
             document.getElementById('filterLine').value = '';
             document.getElementById('filterDept').value = '';
             document.getElementById('filterMode').value = 'bm_on_site';
@@ -437,7 +469,7 @@
             const lines = [headers.join(',')].concat(latestSourceJobs.map(job => {
                 const values = [
                     job.jobId,
-                    getJobDate(job) || '',
+                    getJobDateByMode(job, getSelectedFilters().dateMode || 'report') || '',
                     job.productionLine || '',
                     job.dept || '',
                     job.partNumber || '',
