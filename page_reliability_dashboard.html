@@ -152,8 +152,11 @@
 
         <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
             <div class="cyber-card p-6 min-h-[380px]">
-                <h3 class="text-center text-xl font-bold text-slate-200 uppercase tracking-wide mb-4">KPI</h3>
-                <div class="h-[300px]"><canvas id="kpiPieChart"></canvas></div>
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+                    <h3 class="text-center sm:text-left text-xl font-bold text-slate-200 uppercase tracking-wide">KPI</h3>
+                    <span class="text-[11px] text-slate-400 font-semibold">MTTR / MTBF รายวัน · 2 กะ = 960 นาที</span>
+                </div>
+                <div class="h-[300px]"><canvas id="kpiTrendChart"></canvas></div>
             </div>
 
             <div class="cyber-card p-6 min-h-[380px]">
@@ -174,13 +177,14 @@
     </main>
 
     <script>
-        let kpiPieChart, lineStopChart, bmPartChart, pmPartChart;
+        let kpiTrendChart, lineStopChart, bmPartChart, pmPartChart;
 
         const PRODUCTION_LINES = ['LINE A', 'LINE B', 'LINE C', 'LINE D'];
+        const TWO_SHIFT_PLANNED_MINUTES = 960;
         let currentReliabilityPeriod = 'month';
 
         function destroyCharts() {
-            [kpiPieChart, lineStopChart, bmPartChart, pmPartChart].forEach(chart => {
+            [kpiTrendChart, lineStopChart, bmPartChart, pmPartChart].forEach(chart => {
                 if (chart) chart.destroy();
             });
         }
@@ -331,6 +335,82 @@
             return rows;
         }
 
+        function parseDateForReliability(value) {
+            if (!value) return null;
+            if (typeof toLocalDateOnly === 'function') {
+                const dateOnly = toLocalDateOnly(value);
+                if (dateOnly) return dateOnly;
+            }
+            const text = String(value).trim();
+            const match = text.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+            if (match) return `${match[1]}-${String(match[2]).padStart(2, '0')}-${String(match[3]).padStart(2, '0')}`;
+            const d = new Date(text);
+            if (isNaN(d.getTime())) return null;
+            return formatDateOnly(d);
+        }
+
+        function getClosedDateForReliability(job) {
+            return parseDateForReliability(job.endTime) || parseDateForReliability(job.closedAt);
+        }
+
+        function getRepairMinutes(job) {
+            const direct = Number(job.downtimeMinutes);
+            if (Number.isFinite(direct) && direct > 0) return direct;
+
+            const start = job.startTime ? new Date(String(job.startTime).replace(' ', 'T')).getTime() : NaN;
+            const end = job.endTime ? new Date(String(job.endTime).replace(' ', 'T')).getTime() : NaN;
+            if (Number.isFinite(start) && Number.isFinite(end) && end >= start) {
+                return Math.round((end - start) / 60000);
+            }
+            return 0;
+        }
+
+        function isOnSiteBM(job) {
+            if (String(job.jobType || '').toUpperCase() !== 'BM') return false;
+            const siteType = String(job.repairSiteType || '').toLowerCase().trim();
+            // ข้อมูลเก่าที่ยังไม่มี repairSiteType ให้ fallback เป็น BM เพื่อไม่ให้กราฟว่างทันที
+            return !siteType || siteType === 'on_site' || siteType === 'onsite' || siteType.includes('หน้าเครื่อง');
+        }
+
+        function buildDateList(startDate, endDate) {
+            const dates = [];
+            const start = new Date(`${startDate}T00:00:00`);
+            const end = new Date(`${endDate}T00:00:00`);
+            if (isNaN(start.getTime()) || isNaN(end.getTime())) return dates;
+            let cursor = new Date(start);
+            while (cursor <= end) {
+                dates.push(formatDateOnly(cursor));
+                cursor.setDate(cursor.getDate() + 1);
+            }
+            return dates;
+        }
+
+        function buildDailyKpiTrend(jobs, startDate, endDate) {
+            const labels = [];
+            const mttrSeries = [];
+            const mtbfSeries = [];
+            const dateList = buildDateList(startDate, endDate);
+
+            dateList.forEach(dateStr => {
+                const dayJobs = jobs.filter(job => {
+                    const closedDate = getClosedDateForReliability(job);
+                    return closedDate === dateStr && String(job.status || '').toLowerCase() === 'closed' && isOnSiteBM(job);
+                });
+
+                const totalRepairMinutes = dayJobs.reduce((sum, job) => sum + getRepairMinutes(job), 0);
+                const breakdownCount = dayJobs.length;
+                const mttr = breakdownCount > 0 ? Math.round(totalRepairMinutes / breakdownCount) : 0;
+                const runningMinutes = Math.max(TWO_SHIFT_PLANNED_MINUTES - totalRepairMinutes, 0);
+                const mtbf = breakdownCount > 0 ? Math.round(runningMinutes / breakdownCount) : 0;
+
+                labels.push(dateStr.slice(5));
+                mttrSeries.push(mttr);
+                mtbfSeries.push(mtbf);
+            });
+
+            return { labels, mttrSeries, mtbfSeries };
+        }
+
         function setChartCanvasWidth(canvasId, itemCount) {
             const canvas = document.getElementById(canvasId);
             if (!canvas) return;
@@ -377,31 +457,58 @@
 
             destroyCharts();
 
-            const mttr = kpis ? Number(kpis.overall.avgMTTR || 0) : 0;
-            const mtbf = kpis ? Number(kpis.overall.avgMTBF || 0) : 0;
-            const kpiPieData = (mttr + mtbf) > 0 ? [mttr, mtbf] : [0, 0];
-
-            kpiPieChart = new Chart(document.getElementById('kpiPieChart'), {
-                type: 'pie',
+            const dailyKpi = buildDailyKpiTrend(jobs, range.startDate, range.endDate);
+            kpiTrendChart = new Chart(document.getElementById('kpiTrendChart'), {
+                type: 'line',
                 data: {
-                    labels: ['MTTR', 'MTBF'],
-                    datasets: [{ data: kpiPieData, borderWidth: 0, backgroundColor: ['#4f7df3', '#a78bfa'] }]
+                    labels: dailyKpi.labels,
+                    datasets: [
+                        {
+                            label: 'MTTR',
+                            data: dailyKpi.mttrSeries,
+                            borderColor: '#38bdf8',
+                            backgroundColor: 'rgba(56, 189, 248, 0.12)',
+                            tension: 0.35,
+                            borderWidth: 2,
+                            pointRadius: 3,
+                            pointHoverRadius: 5,
+                            fill: false
+                        },
+                        {
+                            label: 'MTBF',
+                            data: dailyKpi.mtbfSeries,
+                            borderColor: '#fb7185',
+                            backgroundColor: 'rgba(251, 113, 133, 0.12)',
+                            tension: 0.35,
+                            borderWidth: 2,
+                            pointRadius: 3,
+                            pointHoverRadius: 5,
+                            fill: false
+                        }
+                    ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     animation: { duration: 900, easing: 'easeOutQuart' },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#94a3b8', font: { family: 'Prompt', size: 11 }, maxRotation: 0 }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: '#1e293b', drawBorder: false },
+                            ticks: { color: '#94a3b8', precision: 0, font: { family: 'Prompt', size: 11 } },
+                            title: { display: true, text: 'นาที', color: '#94a3b8', font: { family: 'Prompt', size: 11 } }
+                        }
+                    },
                     plugins: {
-                        legend: { position: 'bottom', labels: { color: '#cbd5e1', font: { family: 'Prompt', size: 12 } } },
+                        legend: { position: 'top', labels: { color: '#cbd5e1', font: { family: 'Prompt', size: 12 } } },
                         tooltip: {
-                            callbacks: {
-                                label: ctx => {
-                                    const total = ctx.dataset.data.reduce((s, v) => s + Number(v || 0), 0);
-                                    const value = Number(ctx.raw || 0);
-                                    const pct = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
-                                    return `${ctx.label}: ${value} นาที (${pct}%)`;
-                                }
-                            }
+                            bodyFont: { family: 'Prompt' },
+                            titleFont: { family: 'Prompt' },
+                            callbacks: { label: ctx => `${ctx.dataset.label}: ${Number(ctx.raw || 0)} นาที` }
                         }
                     }
                 }
