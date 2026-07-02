@@ -607,13 +607,16 @@ function fetchAndCalculateKPIs(startDate = null, endDate = null, options = {}) {
     const kpiBreakdowns = closedJobs.filter(j => isClosedBmOnSite(j) && isValidRepairDuration(j));
     const pmClosed = closedJobs.filter(j => j.jobType === 'PM');
 
-    const totalRepairMinutes = kpiBreakdowns.reduce((sum, job) => sum + parseNumber(job.downtimeMinutes, 0), 0);
-    const avgMTTR = kpiBreakdowns.length > 0 ? Math.round(totalRepairMinutes / kpiBreakdowns.length) : 0;
+    // Dashboard summary cards should show the full repair picture for the selected page/range.
+    // Strict KPI-only values (BM On Site + valid duration) remain available through totalKpiBreakdowns
+    // and KPI Analytics; the dashboard cards use all closed BM jobs so Repair Mins/MTTR/MTBF do not show 0.
+    const totalRepairMinutes = breakdowns.reduce((sum, job) => sum + parseNumber(job.downtimeMinutes, 0), 0);
+    const avgMTTR = breakdowns.length > 0 ? Math.round(totalRepairMinutes / breakdowns.length) : 0;
 
-    const uniqueDates = [...new Set(kpiBreakdowns.map(job => getJobDateByMode(job, dateMode)).filter(Boolean))];
+    const uniqueDates = [...new Set(breakdowns.map(job => getJobDateByMode(job, dateMode)).filter(Boolean))];
     let sumDailyMTBF = 0;
     uniqueDates.forEach(dateStr => {
-        const dayBreakdowns = kpiBreakdowns.filter(j => getJobDateByMode(j, dateMode) === dateStr);
+        const dayBreakdowns = breakdowns.filter(j => getJobDateByMode(j, dateMode) === dateStr);
         const dayJobs = filteredJobs.filter(j => getJobDateByMode(j, dateMode) === dateStr);
         const dailyRepairMinutes = dayBreakdowns.reduce((sum, job) => sum + parseNumber(job.downtimeMinutes, 0), 0);
         const runningMinutes = Math.max(getShiftMinutesForDay(dayJobs) - dailyRepairMinutes, 0);
@@ -621,18 +624,34 @@ function fetchAndCalculateKPIs(startDate = null, endDate = null, options = {}) {
     });
     const avgMTBF = uniqueDates.length > 0 ? Math.round(sumDailyMTBF / uniqueDates.length) : 0;
 
+    const totalKpiRepairMinutes = kpiBreakdowns.reduce((sum, job) => sum + parseNumber(job.downtimeMinutes, 0), 0);
+    const avgKpiMTTR = kpiBreakdowns.length > 0 ? Math.round(totalKpiRepairMinutes / kpiBreakdowns.length) : 0;
+    const kpiUniqueDates = [...new Set(kpiBreakdowns.map(job => getJobDateByMode(job, dateMode)).filter(Boolean))];
+    let sumKpiDailyMTBF = 0;
+    kpiUniqueDates.forEach(dateStr => {
+        const dayBreakdowns = kpiBreakdowns.filter(j => getJobDateByMode(j, dateMode) === dateStr);
+        const dayJobs = filteredJobs.filter(j => getJobDateByMode(j, dateMode) === dateStr);
+        const dailyRepairMinutes = dayBreakdowns.reduce((sum, job) => sum + parseNumber(job.downtimeMinutes, 0), 0);
+        const runningMinutes = Math.max(getShiftMinutesForDay(dayJobs) - dailyRepairMinutes, 0);
+        sumKpiDailyMTBF += dayBreakdowns.length > 0 ? Math.round(runningMinutes / dayBreakdowns.length) : 0;
+    });
+    const avgKpiMTBF = kpiUniqueDates.length > 0 ? Math.round(sumKpiDailyMTBF / kpiUniqueDates.length) : 0;
+
     const depts = ['S-D', 'L-D', 'P-D'];
     const byDept = {};
     depts.forEach(dept => {
         const deptJobs = filteredJobs.filter(j => j.dept === dept);
         const deptBreakdowns = breakdowns.filter(j => j.dept === dept);
         const deptKpiBreakdowns = kpiBreakdowns.filter(j => j.dept === dept);
-        const deptRepairMinutes = deptKpiBreakdowns.reduce((sum, job) => sum + parseNumber(job.downtimeMinutes, 0), 0);
+        const deptRepairMinutes = deptBreakdowns.reduce((sum, job) => sum + parseNumber(job.downtimeMinutes, 0), 0);
+        const deptKpiRepairMinutes = deptKpiBreakdowns.reduce((sum, job) => sum + parseNumber(job.downtimeMinutes, 0), 0);
         byDept[dept] = {
             totalJobs: deptJobs.length,
             breakdowns: deptBreakdowns.length,
             repairMinutes: deptRepairMinutes,
-            mttr: deptKpiBreakdowns.length > 0 ? Math.round(deptRepairMinutes / deptKpiBreakdowns.length) : 0
+            mttr: deptBreakdowns.length > 0 ? Math.round(deptRepairMinutes / deptBreakdowns.length) : 0,
+            kpiRepairMinutes: deptKpiRepairMinutes,
+            kpiMttr: deptKpiBreakdowns.length > 0 ? Math.round(deptKpiRepairMinutes / deptKpiBreakdowns.length) : 0
         };
     });
 
@@ -688,12 +707,12 @@ function fetchAndCalculateKPIs(startDate = null, endDate = null, options = {}) {
         const dayBreakdowns = dayClosedJobs.filter(j => j.jobType === 'BM');
         const dayKpiBreakdowns = dayClosedJobs.filter(j => isClosedBmOnSite(j) && isValidRepairDuration(j));
         const dayPMs = dayClosedJobs.filter(j => j.jobType === 'PM');
-        const dayRepairMinutes = dayKpiBreakdowns.reduce((sum, job) => sum + parseNumber(job.downtimeMinutes, 0), 0);
-        const dayMTTR = dayKpiBreakdowns.length > 0 ? Math.round(dayRepairMinutes / dayKpiBreakdowns.length) : 0;
+        const dayRepairMinutes = dayBreakdowns.reduce((sum, job) => sum + parseNumber(job.downtimeMinutes, 0), 0);
+        const dayMTTR = dayBreakdowns.length > 0 ? Math.round(dayRepairMinutes / dayBreakdowns.length) : 0;
 
         const dayShiftSourceJobs = dayIncomingJobs.length || dayClosedJobs.length ? [...dayIncomingJobs, ...dayClosedJobs] : dayPendingJobs;
         const dayRunningMinutes = Math.max(getShiftMinutesForDay(dayShiftSourceJobs) - dayRepairMinutes, 0);
-        const dayMTBF = dayKpiBreakdowns.length > 0 ? Math.round(dayRunningMinutes / dayKpiBreakdowns.length) : 0;
+        const dayMTBF = dayBreakdowns.length > 0 ? Math.round(dayRunningMinutes / dayBreakdowns.length) : 0;
 
         trend.dates.push(dateStr);
         trend.labels.push(dateStr ? dateStr.slice(5) : '');
@@ -724,6 +743,9 @@ function fetchAndCalculateKPIs(startDate = null, endDate = null, options = {}) {
             totalRepairMinutes,
             avgMTTR,
             avgMTBF,
+            totalKpiRepairMinutes,
+            avgKpiMTTR,
+            avgKpiMTBF,
             anomalyJobs: getDataQualityIssues(startDate, endDate, { dateMode }).length
         },
         byDept,
